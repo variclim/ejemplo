@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>VariClim - Pronóstico 1 día / 3 días</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Inter', 'Roboto', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0b2b3b 0%, #1a4a5f 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .windy-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 2rem;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #0f2f3b;
+            padding: 1.2rem 2rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 3px solid #ffb347;
+        }
+
+        .header h1 {
+            font-weight: 600;
+            font-size: 1.7rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            background: #ffb347;
+            color: #1e2f35;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .search-section {
+            padding: 1.8rem 2rem;
+            background: #fefcf5;
+            border-bottom: 1px solid #e2e0d4;
+        }
+
+        .search-card {
+            background: #eef3f7;
+            border-radius: 1.5rem;
+            padding: 1.2rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .input-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-search {
+            flex: 2;
+            min-width: 220px;
+            position: relative;
+        }
+
+        .input-search label {
+            font-weight: 600;
+            color: #1e4a62;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .input-search input {
+            width: 100%;
+            padding: 12px 16px;
+            border-radius: 2rem;
+            border: 1px solid #cbd5e1;
+            font-size: 1rem;
+            background: white;
+        }
+
+        .suggestions-box {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 1rem;
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: none;
+        }
+        .suggestion-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e0d4;
+            transition: background 0.2s;
+        }
+        .suggestion-item:hover {
+            background: #eef3f7;
+        }
+        .suggestion-name {
+            font-weight: 600;
+            color: #1e2f35;
+        }
+        .suggestion-detail {
+            font-size: 0.7rem;
+            color: #2c6e8f;
+        }
+
+        .btn-primary, .btn-primary2 {
+            background: #ff9f2e;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary2 {
+            background: #27ae60;
+        }
+        .btn-primary:hover, .btn-primary2:hover {
+            transform: translateY(-2px);
+            opacity: 0.9;
+        }
+        .btn-primary2:hover {
+            background: #2ecc71;
+        }
+
+        .datos-auto {
+            background: #e8f0f5;
+            border-radius: 1.2rem;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .datos-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 10px;
+        }
+
+        .dato-card {
+            background: white;
+            border-radius: 1.2rem;
+            padding: 12px 16px;
+            flex: 1;
+            min-width: 140px;
+            border-left: 4px solid #ffb347;
+        }
+
+        .dato-card label {
+            font-size: 0.7rem;
+            color: #2c6e8f;
+            font-weight: bold;
+            display: block;
+        }
+
+        .dato-card .valor {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1e2f35;
+            margin-top: 5px;
+        }
+
+        .charts-container {
+            margin: 20px 0 10px;
+            background: white;
+            border-radius: 1.2rem;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .charts-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #104152;
+            font-size: 1rem;
+            border-left: 4px solid #ffb347;
+            padding-left: 12px;
+        }
+        .charts-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .chart-card {
+            flex: 1;
+            min-width: 300px;
+            background: #fef9ef;
+            border-radius: 1rem;
+            padding: 12px;
+            border: 1px solid #ffe2b5;
+        }
+        .chart-card canvas {
+            max-height: 250px;
+            width: 100%;
+        }
+        .chart-label {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 8px;
+            color: #1e4a62;
+            font-size: 0.85rem;
+        }
+
+        .observaciones {
+            margin: 15px 0 10px;
+        }
+
+        .observaciones textarea {
+            width: 100%;
+            border-radius: 1.2rem;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0 0;
+            flex-wrap: wrap;
+        }
+
+        .btn-secondary {
+            background: #2c5f74;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 2rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: #1f4a5c;
+        }
+
+        .btn-pdf {
+            background: #e74c3c;
+        }
+        .btn-pdf:hover {
+            background: #c0392b;
+        }
+
+        .preview-section {
+            padding: 1.2rem 2rem 2rem;
+            background: white;
+            border-top: 1px solid #e2e0d4;
+        }
+
+        .pronostico-text {
+            background: #fef9ef;
+            padding: 1.2rem;
+            border-radius: 1.2rem;
+            font-family: 'Courier New', 'SF Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            border-left: 4px solid #ffb347;
+            margin: 10px 0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .alert {
+            background: #d4edda;
+            color: #155724;
+            padding: 10px 16px;
+            border-radius: 2rem;
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .origen {
+            font-size: 0.7rem;
+            color: #2c6e8f;
+            text-align: right;
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px dashed #cbd5e1;
+        }
+
+        footer {
+            background: #e6edea;
+            padding: 12px;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #4f6f7a;
+        }
+
+        @media (max-width: 700px) {
+            .search-section, .preview-section { padding: 1rem; }
+            .charts-grid { flex-direction: column; }
+        }
+            
+        .emoji-imagen {
+            width: 2em;
+            height: 2em;
+            vertical-align: middle;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="windy-container">
+    <div class="header">
+        <h1><img src="Documentos/Data/variclim_fondo_2.png" alt="VariClim" class="emoji-imagen"> VariClim 🌎 Pronóstico 🌎</h1>
+        <div class="badge">📊 Informe 1D / 3D</div>
+    </div>
+
+    <div class="search-section">
+        <div class="search-card">
+            <div class="input-group">
+                <div class="input-search">
+                    <label>📍 Lugar (ciudad o coordenadas)</label>
+                    <input type="text" id="lugarInput" placeholder="Ej: San Luis Potosí, Matehuala, Rioverde" value="San Luis Potosí">
+                    <div id="suggestionsBox" class="suggestions-box"></div>
+                </div>
+                <button class="btn-primary" id="buscarClimaBtn">
+                    🌍 Obtener Pronóstico
+                </button>
+                <button class="btn-primary2" id="generarInforme1DiaBtn">
+                    📄 Informe 1 día
+                </button>
+                <button class="btn-primary2" id="generarInforme3DiasBtn" style="background:#2980b9;">
+                    📊 Informe 3 días
+                </button>
+            </div>
+        </div>
+
+        <div id="estadoMensaje" class="alert" style="display: none;"></div>
+
+        <div class="datos-auto">
+            <strong>📡 DATOS ACTUALES</strong>
+            <div class="datos-grid">
+                <div class="dato-card"><label>🌡️ Temperatura</label><div class="valor" id="tempValor">---</div></div>
+                <div class="dato-card"><label>💧 Humedad</label><div class="valor" id="humedadValor">---</div></div>
+                <div class="dato-card"><label>💨 Viento</label><div class="valor" id="vientoValor">---</div></div>
+                <div class="dato-card"><label>💨 Ráfagas</label><div class="valor" id="rafagasValor">---</div></div>
+                <div class="dato-card"><label>💧 Punto rocío</label><div class="valor" id="rocíoValor">---</div></div>
+                <div class="dato-card"><label>☔ Prob. precip</label><div class="valor" id="probPrecipValor">---</div></div>
+                <div class="dato-card"><label>🌧️ Precipitación</label><div class="valor" id="precipTotalValor">---</div></div>
+                <div class="dato-card"><label>☁️ Nubosidad</label><div class="valor" id="nubosidadValor">---</div></div>
+                <div class="dato-card"><label>☀️ Índice UV</label><div class="valor" id="uvValor">---</div></div>
+            </div>
+            <div class="origen" id="origenInfo">🔄 Escribe un lugar y selecciona una sugerencia o presiona "Obtener Pronóstico"</div>
+        </div>
+
+        <div id="chartsSection" class="charts-container" style="display: none;">
+            <div class="charts-title">📈 GRÁFICOS EVOLUTIVOS</div>
+            <div id="chartsGrid" class="charts-grid">
+                <div class="chart-card">
+                    <canvas id="tempChart" width="500" height="220"></canvas>
+                    <div class="chart-label" id="tempChartLabel">🌡️ Temperatura</div>
+                </div>
+                <div class="chart-card">
+                    <canvas id="precipChart" width="500" height="220"></canvas>
+                    <div class="chart-label" id="precipChartLabel">🌧️ Precipitación</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="observaciones">
+            <label>📝 Observaciones adicionales</label>
+            <textarea id="observacionesTexto" rows="2" placeholder="Ej: sensación térmica, recomendaciones..."></textarea>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-secondary" id="copiarBtn">📋 Copiar texto</button>
+            <button class="btn-secondary btn-pdf" id="exportarPdfBtn">📑 PDF (gráficas)</button>
+        </div>
+    </div>
+
+    <div class="preview-section">
+        <h3 style="margin-bottom: 10px;">📋 Informe meteorológico completo</h3>
+        <div id="resultadoDiv" class="pronostico-text">
+            🔍 Escribe un lugar y haz clic en "Obtener Pronóstico"
+        </div>
+    </div>
+    <footer>
+        🌎 Datos: Open-Meteo | Informe 1 día: datos del día actual | Informe 3 días: datos promedio del período
+    </footer>
+</div>
+
+<script>
+    // Elementos DOM
+    const lugarInput = document.getElementById('lugarInput');
+    const buscarBtn = document.getElementById('buscarClimaBtn');
+    const informe1DiaBtn = document.getElementById('generarInforme1DiaBtn');
+    const informe3DiasBtn = document.getElementById('generarInforme3DiasBtn');
+    const estadoDiv = document.getElementById('estadoMensaje');
+    const origenInfoSpan = document.getElementById('origenInfo');
+    const observacionesTextarea = document.getElementById('observacionesTexto');
+    const copiarBtn = document.getElementById('copiarBtn');
+    const exportarPdfBtn = document.getElementById('exportarPdfBtn');
+    const resultadoDiv = document.getElementById('resultadoDiv');
+    const chartsSection = document.getElementById('chartsSection');
+    const suggestionsBox = document.getElementById('suggestionsBox');
+    const uvValor = document.getElementById('uvValor');
+    const rafagasValor = document.getElementById('rafagasValor');
+
+    const tempValor = document.getElementById('tempValor');
+    const humedadValor = document.getElementById('humedadValor');
+    const vientoValor = document.getElementById('vientoValor');
+    const rocíoValor = document.getElementById('rocíoValor');
+    const probPrecipValor = document.getElementById('probPrecipValor');
+    const precipTotalValor = document.getElementById('precipTotalValor');
+    const nubosidadValor = document.getElementById('nubosidadValor');
+
+    let storedData = { lugarNombre: "", current: {}, daily: [], hourly: [], uvIndexMax: 0, timestamp: "" };
+    let charts = { temp: null, precip: null };
+    let debounceTimeout = null;
+
+    // Función para clasificar viento según velocidad (km/h)
+    function obtenerCategoriaViento(velocidadKmh) {
+        const vel = Math.round(velocidadKmh);
+        if (vel < 20) return "Brisa Débil";
+        if (vel <= 40) return "Brisa Moderada";
+        if (vel <= 70) return "Viento Fuerte";
+        if (vel <= 120) return "Viento Muy Fuerte";
+        if (vel <= 150) return "Viento Intenso / Tormenta";
+        return "Huracanado";
+    }
+
+    function obtenerCategoriaRafaga(velocidadKmh) {
+        const vel = Math.round(velocidadKmh);
+        if (vel < 20) return "Brisa Débil";
+        if (vel <= 40) return "Brisa Moderada";
+        if (vel <= 70) return "Viento Fuerte";
+        if (vel <= 120) return "Viento Muy Fuerte";
+        if (vel <= 150) return "Viento Intenso / Tormenta";
+        return "Huracanado";
+    }
+
+    // Función para clasificar precipitación y determinar si es tormenta
+    function clasificarPrecipitacion(mm) {
+        const val = parseFloat(mm);
+        if (isNaN(val)) return { tipo: "sin datos", nivel: 0, descripcion: "sin datos de precipitación" };
+        if (val < 0.1) return { tipo: "Sin precipitaciones", nivel: 0, descripcion: "sin precipitaciones significativas" };
+        if (val <= 5) return { tipo: "Ligeras", nivel: 1, descripcion: "Ligeras (0 a 5 mm) - Cielo nublado, llovizna muy leve. Poca o nula afectación." };
+        if (val <= 20) return { tipo: "Moderadas", nivel: 2, descripcion: "Moderadas (5 a 20 mm) - Lluvia constante y visible. Puede encharcar vialidades." };
+        if (val <= 50) return { tipo: "Fuertes", nivel: 3, descripcion: "Fuertes (20 a 50 mm) - Lluvia intensa, reduce la visibilidad al conducir y provoca encharcamientos." };
+        if (val <= 75) return { tipo: "Muy Fuertes", nivel: 4, descripcion: "Muy Fuertes (50 a 75 mm) - Riesgo de encharcamientos severos, ligeros deslaves e incrementos en niveles de ríos y arroyos." };
+        if (val <= 150) return { tipo: "Intensas", nivel: 5, descripcion: "Intensas (75 a 150 mm) - Probables inundaciones urbanas, fuerte corriente en arroyos y daños en vialidades." };
+        return { tipo: "Torrenciales", nivel: 6, descripcion: "Torrenciales (más de 150 mm) - Lluvias extremas. Alto riesgo de inundaciones severas, deslaves mayores y desbordamiento de ríos." };
+    }
+
+    function clasificarNubosidad(porcentaje) {
+        const nub = Math.round(porcentaje);
+        if (isNaN(nub)) return "variables";
+        if (nub <= 12) return "despejados (sin nubes o una cantidad casi nula)";
+        if (nub <= 37) return "poco nubosos (mayormente despejado, con algunas nubes dispersas)";
+        if (nub <= 50) return "medio nublados (el cielo está cubierto exactamente hasta la mitad)";
+        if (nub <= 87) return "nubosos (mayormente cubierto por nubes, con pocos claros)";
+        return "cubiertos (cielo completamente tapado por nubes, no hay huecos visibles)";
+    }
+
+    function recomendacionUV(uvIndex) {
+        const uv = Math.round(uvIndex);
+        if (uv <= 2) return { nivel: "Bajo", recomendacion: "Use gafas de sol. Se recomienda usar protector solar." };
+        if (uv <= 5) return { nivel: "Moderado", recomendacion: "Use protector solar, camisa, sombrero y gafas de sol. Busque sombra al mediodía." };
+        if (uv <= 7) return { nivel: "Alto", recomendacion: "Protección extra indispensable. Reduzca la exposición al sol entre las 10 a.m. y las 4 p.m." };
+        if (uv <= 10) return { nivel: "Muy alto", recomendacion: "Reduzca el tiempo bajo el sol. La piel sin protección se daña rápidamente." };
+        return { nivel: "Extremadamente alto", recomendacion: "Tome precauciones extremas. Evite salir al sol. Use filtro, camisa manga larga, sombrero y lentes." };
+    }
+
+    // Función para generar recomendaciones de tormenta según nivel de precipitación
+    function obtenerRecomendacionTormenta(nivelPrecipitacion) {
+        if (nivelPrecipitacion >= 2) { // Moderada, Fuerte, Muy Fuerte, Intensa, Torrencial
+            return "• ⚡ Los eventos de lluvia pueden estar acompañados de actividad eléctrica y potencial caída de granizo. Extreme precauciones.\n";
+        }
+        return "";
+    }
+
+    function mostrarEstado(msg, isError = false) {
+        estadoDiv.style.display = 'block';
+        estadoDiv.textContent = msg;
+        estadoDiv.className = isError ? 'alert error' : 'alert';
+        setTimeout(() => { estadoDiv.style.display = 'none'; }, 4000);
+    }
+
+    async function obtenerSugerencias(query) {
+        if (query.length < 2) { suggestionsBox.style.display = 'none'; return; }
+        try {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=6&addressdetails=1`;
+            const resp = await fetch(url, { headers: { 'User-Agent': 'VariClimApp/1.0' } });
+            const data = await resp.json();
+            if (data && data.length > 0) {
+                suggestionsBox.innerHTML = '';
+                data.forEach(place => {
+                    const div = document.createElement('div');
+                    div.className = 'suggestion-item';
+                    const displayName = place.display_name.split(',')[0];
+                    div.innerHTML = `<div class="suggestion-name">${displayName}</div><div class="suggestion-detail">${place.display_name.substring(0, 80)}...</div>`;
+                    div.addEventListener('click', () => {
+                        lugarInput.value = displayName;
+                        suggestionsBox.style.display = 'none';
+                        cargarClima();
+                    });
+                    suggestionsBox.appendChild(div);
+                });
+                suggestionsBox.style.display = 'block';
+            } else { suggestionsBox.style.display = 'none'; }
+        } catch (error) { suggestionsBox.style.display = 'none'; }
+    }
+
+    lugarInput.addEventListener('input', (e) => {
+        if (debounceTimeout) clearTimeout(debounceTimeout);
+        const query = e.target.value.trim();
+        if (query.length >= 2) debounceTimeout = setTimeout(() => obtenerSugerencias(query), 400);
+        else suggestionsBox.style.display = 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!lugarInput.contains(e.target) && !suggestionsBox.contains(e.target)) suggestionsBox.style.display = 'none';
+    });
+
+    async function geocode(query) {
+        const coordRegex = /^[-+]?([1-8]?\d(\.\d+)?|90(\.0+)?),\s*[-+]?(180(\.0+)?|((1[0-7]\d)|([1-9]?\d))(\.\d+)?)$/;
+        if (coordRegex.test(query.replace(/\s/g, ''))) {
+            const partes = query.split(',').map(p => parseFloat(p.trim()));
+            if (partes.length === 2 && !isNaN(partes[0]) && !isNaN(partes[1])) {
+                return { lat: partes[0], lon: partes[1], nombre: `${partes[0]}, ${partes[1]}` };
+            }
+        }
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const resp = await fetch(url, { headers: { 'User-Agent': 'VariClimApp/1.0' } });
+        const data = await resp.json();
+        if (!data || data.length === 0) throw new Error(`No se encontró "${query}"`);
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), nombre: data[0].display_name.split(',')[0] };
+    }
+
+    async function fetchWeather(lat, lon) {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,relative_humidity_2m,dewpoint_2m,precipitation_probability,precipitation,cloudcover,windspeed_10m,winddirection_10m,windgusts_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,rain_sum,showers_sum,windspeed_10m_max,windgusts_10m_max,winddirection_10m_dominant,uv_index_max&current_weather=true&timezone=auto&forecast_days=4`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        
+        const now = new Date();
+        const currentHour = now.getHours();
+        let idx = 0;
+        for (let i = 0; i < data.hourly.time.length; i++) {
+            if (new Date(data.hourly.time[i]).getHours() === currentHour) { idx = i; break; }
+        }
+        
+        const windSpd = data.current_weather?.windspeed;
+        const windDir = data.current_weather?.winddirection;
+        let viento = "Sin datos";
+        if (windSpd) {
+            const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+            const dIdx = Math.round(((windDir % 360) / 45)) % 8;
+            viento = `${Math.round(windSpd)} km/h ${dirs[dIdx]}`;
+        }
+        
+        const rafagaActual = data.hourly.windgusts_10m?.[idx] || 0;
+        
+        const current = {
+            temperatura: data.hourly.temperature_2m?.[idx]?.toFixed(0) + "°C" || "---",
+            humedad: Math.round(data.hourly.relative_humidity_2m?.[idx]) + "%" || "---",
+            viento: viento,
+            rafagas: Math.round(rafagaActual) + " km/h",
+            puntoRocio: data.hourly.dewpoint_2m?.[idx]?.toFixed(0) + "°C" || "---",
+            probPrecip: Math.round(data.hourly.precipitation_probability?.[idx]) + "%" || "0%",
+            precipTotal: Math.round(data.hourly.precipitation?.[idx]) + " mm" || "0 mm",
+            nubosidad: Math.round(data.hourly.cloudcover?.[idx]) + "%" || "---"
+        };
+        
+        const hourly = [];
+        const horas = [];
+        const temps = [];
+        const precips = [];
+        
+        for (let i = idx; i < Math.min(idx + 24, data.hourly.time.length); i++) {
+            const date = new Date(data.hourly.time[i]);
+            const horaLabel = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            const tempVal = data.hourly.temperature_2m?.[i];
+            const precipVal = data.hourly.precipitation?.[i] || 0;
+            horas.push(horaLabel);
+            temps.push(tempVal !== null ? Math.round(tempVal) : 0);
+            precips.push(Math.round(precipVal));
+            hourly.push({ hora: horaLabel, temp: tempVal !== null ? Math.round(tempVal) + "°C" : "---", precip: Math.round(precipVal) + " mm" });
+        }
+        
+        const today = new Date(); today.setHours(0,0,0,0);
+        const daily = [];
+        let uvMaxGeneral = 0;
+        
+        for (let d = 0; d <= 2; d++) {
+            const targetDate = new Date(today); targetDate.setDate(today.getDate() + d);
+            let foundIndex = -1;
+            for (let i = 0; i < data.daily.time.length; i++) {
+                const apiDate = new Date(data.daily.time[i]); apiDate.setHours(0,0,0,0);
+                if (apiDate.getTime() === targetDate.getTime()) { foundIndex = i; break; }
+            }
+            if (foundIndex !== -1) {
+                const date = new Date(data.daily.time[foundIndex]);
+                let nubosidadMedia = 50;
+                if (data.hourly && data.hourly.cloudcover) {
+                    let sum = 0, count = 0;
+                    for (let h = foundIndex * 24; h < (foundIndex + 1) * 24 && h < data.hourly.cloudcover.length; h++) {
+                        if (data.hourly.cloudcover[h] !== undefined) {
+                            sum += data.hourly.cloudcover[h];
+                            count++;
+                        }
+                    }
+                    if (count > 0) nubosidadMedia = Math.round(sum / count);
+                }
+                const uvMax = data.daily.uv_index_max?.[foundIndex] || 0;
+                if (uvMax > uvMaxGeneral) uvMaxGeneral = uvMax;
+                
+                const vientoMax = Math.round(data.daily.windspeed_10m_max?.[foundIndex] || 0);
+                const rafagaMax = Math.round(data.daily.windgusts_10m_max?.[foundIndex] || 0);
+                const vientoCategoria = obtenerCategoriaViento(vientoMax);
+                const rafagaCategoria = obtenerCategoriaRafaga(rafagaMax);
+                const precipMM = Math.round(data.daily.precipitation_sum?.[foundIndex] || 0);
+                const precipInfo = clasificarPrecipitacion(precipMM);
+                
+                const diaSemana = date.toLocaleDateString('es-ES', { weekday: 'long' });
+                const diaNumero = date.getDate();
+                const mesNumero = date.getMonth() + 1;
+                const labelGrafico = `${diaSemana} ${diaNumero}/${mesNumero}`;
+                
+                daily.push({
+                    titulo: d === 0 ? "HOY" : (d === 1 ? "MAÑANA" : "PASADO MAÑANA"),
+                    fecha: date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }),
+                    labelGrafico: labelGrafico,
+                    tempMax: Math.round(data.daily.temperature_2m_max?.[foundIndex]) + "°C" || "---",
+                    tempMin: Math.round(data.daily.temperature_2m_min?.[foundIndex]) + "°C" || "---",
+                    precipitacion: precipMM + " mm",
+                    precipitacionNivel: precipInfo.nivel,
+                    precipitacionTipo: precipInfo.tipo,
+                    probPrecip: Math.round(data.daily.precipitation_probability_max?.[foundIndex]) + "%" || "0%",
+                    vientoVel: vientoMax + " km/h",
+                    vientoCategoria: vientoCategoria,
+                    rafagaVel: rafagaMax + " km/h",
+                    rafagaCategoria: rafagaCategoria,
+                    nubosidadMedia: nubosidadMedia,
+                    uvIndex: uvMax
+                });
+            }
+        }
+        
+        return { current, hourly, horas, temps, precips, daily, uvMaxGeneral };
+    }
+    
+    function renderUI(weather) {
+        tempValor.innerText = weather.current.temperatura;
+        humedadValor.innerText = weather.current.humedad;
+        vientoValor.innerText = weather.current.viento;
+        rafagasValor.innerText = weather.current.rafagas;
+        rocíoValor.innerText = weather.current.puntoRocio;
+        probPrecipValor.innerText = weather.current.probPrecip;
+        precipTotalValor.innerText = weather.current.precipTotal;
+        nubosidadValor.innerText = weather.current.nubosidad;
+        uvValor.innerText = Math.round(weather.uvMaxGeneral);
+        
+        storedData = { 
+            lugarNombre: storedData.lugarNombre, 
+            current: weather.current, 
+            daily: weather.daily, 
+            hourly: weather.hourly,
+            horas: weather.horas,
+            temps: weather.temps,
+            precips: weather.precips,
+            uvMaxGeneral: weather.uvMaxGeneral, 
+            timestamp: new Date().toLocaleString() 
+        };
+        
+        chartsSection.style.display = 'block';
+    }
+    
+    function actualizarGraficos1Dia() {
+        if (!storedData.horas) return;
+        
+        if (charts.temp) charts.temp.destroy();
+        if (charts.precip) charts.precip.destroy();
+        
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        const precipCtx = document.getElementById('precipChart').getContext('2d');
+        
+        document.getElementById('tempChartLabel').innerHTML = '🌡️ Temperatura (°C) - Próximas 24h';
+        document.getElementById('precipChartLabel').innerHTML = '🌧️ Precipitación (mm) - Próximas 24h';
+        
+        charts.temp = new Chart(tempCtx, {
+            type: 'line',
+            data: { labels: storedData.horas, datasets: [{ label: 'Temperatura (°C)', data: storedData.temps, borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true, tension: 0.3 }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+        
+        charts.precip = new Chart(precipCtx, {
+            type: 'bar',
+            data: { labels: storedData.horas, datasets: [{ label: 'Precipitación (mm)', data: storedData.precips, backgroundColor: '#3498db', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
+    
+    function actualizarGraficos3Dias() {
+        if (!storedData.daily) return;
+        
+        if (charts.temp) charts.temp.destroy();
+        if (charts.precip) charts.precip.destroy();
+        
+        const tempCtx = document.getElementById('tempChart').getContext('2d');
+        const precipCtx = document.getElementById('precipChart').getContext('2d');
+        
+        const labels = storedData.daily.map(d => d.labelGrafico);
+        const tempsMax = storedData.daily.map(d => parseInt(d.tempMax));
+        const tempsMin = storedData.daily.map(d => parseInt(d.tempMin));
+        const precips = storedData.daily.map(d => parseInt(d.precipitacion));
+        
+        document.getElementById('tempChartLabel').innerHTML = '🌡️ Temperatura (°C) - Máximas y Mínimas';
+        document.getElementById('precipChartLabel').innerHTML = '🌧️ Precipitación acumulada (mm)';
+        
+        charts.temp = new Chart(tempCtx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Temperatura Máxima (°C)', data: tempsMax, backgroundColor: '#e74c3c', borderRadius: 6 }, { label: 'Temperatura Mínima (°C)', data: tempsMin, backgroundColor: '#3498db', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } } }
+        });
+        
+        charts.precip = new Chart(precipCtx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Precipitación acumulada (mm)', data: precips, backgroundColor: '#2ecc71', borderRadius: 6 }] },
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+    }
+    
+    // Informe 1 día
+    function generarInforme1Dia() {
+        if (!storedData.current.temperatura) { resultadoDiv.innerHTML = "⚠️ No hay datos. Use 'Obtener Pronóstico' primero."; return; }
+        const lugar = storedData.lugarNombre;
+        const fechaActual = new Date();
+        const fechaStr = fechaActual.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        const hoy = storedData.daily[0];
+        const obs = observacionesTextarea.value.trim() || "Sin observaciones adicionales.";
+        const uvRecomendacion = recomendacionUV(storedData.uvMaxGeneral);
+        const nubosidadTexto = clasificarNubosidad(hoy.nubosidadMedia);
+        const precipInfo = clasificarPrecipitacion(parseInt(hoy.precipitacion));
+        const tempMax = hoy.tempMax.replace('°C', ' C');
+        const tempMin = hoy.tempMin.replace('°C', ' C');
+        const recomendacionTormenta = obtenerRecomendacionTormenta(hoy.precipitacionNivel);
+        
+        let texto = `🌤️ PRONÓSTICO DEL TIEMPO • ${lugar.toUpperCase()}\n`;
+        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        texto += `📅 Fecha del informe: ${fechaStr}\n`;
+        texto += `📆 Pronóstico para: HOY (${hoy.fecha})\n\n`;
+        texto += `***HOY***\n`;
+        texto += `Se esperan temperaturas máximas de ${tempMax} y mínimas de ${tempMin}, `;
+        texto += `se esperan cielos ${nubosidadTexto} con espacios de sol dispersos, `;
+        texto += `vientos de ${hoy.vientoVel} (${hoy.vientoCategoria}), con ráfagas de ${hoy.rafagaVel} (${hoy.rafagaCategoria}), `;
+        texto += `se esperan precipitaciones de tipo ${precipInfo.descripcion}\n\n`;
+        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        texto += `📌 RECOMENDACIONES:\n`;
+        texto += `• Índice UV máximo: ${Math.round(storedData.uvMaxGeneral)} - Nivel ${uvRecomendacion.nivel}\n`;
+        texto += `• ${uvRecomendacion.recomendacion}\n`;
+        if (recomendacionTormenta) {
+            texto += recomendacionTormenta;
+        }
+        texto += `• Precaución por eventos de precipitaciones en las próximas horas.\n`;
+        texto += `• Se recomienda mantenerse informado sobre las condiciones meteorológicas.\n\n`;
+        texto += `📝 OBSERVACIONES ADICIONALES: ${obs}\n\n`;
+        texto += `🔮 Fuente: Open-Meteo (datos en tiempo real)\n`;
+        texto += `🕒 Actualización: ${storedData.timestamp}\n`;
+        
+        resultadoDiv.innerText = texto;
+        actualizarGraficos1Dia();
+        return texto;
+    }
+    
+    // Informe 3 días
+    function generarInforme3Dias() {
+        if (!storedData.current.temperatura) { resultadoDiv.innerHTML = "⚠️ No hay datos. Use 'Obtener Pronóstico' primero."; return; }
+        const lugar = storedData.lugarNombre;
+        const fechaActual = new Date();
+        const fechaStr = fechaActual.toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+        const obs = observacionesTextarea.value.trim() || "Sin observaciones adicionales.";
+        const uvRecomendacion = recomendacionUV(storedData.uvMaxGeneral);
+        
+        let sumTempMax = 0, sumTempMin = 0, sumNubosidad = 0, sumVientoVel = 0, sumRafagaVel = 0;
+        let sumPrecip = 0, maxNivelPrecip = 0;
+        let diasValidos = 0;
+        
+        for (let i = 0; i < storedData.daily.length && i < 3; i++) {
+            const day = storedData.daily[i];
+            sumTempMax += parseInt(day.tempMax);
+            sumTempMin += parseInt(day.tempMin);
+            sumNubosidad += day.nubosidadMedia;
+            sumVientoVel += parseInt(day.vientoVel);
+            sumRafagaVel += parseInt(day.rafagaVel);
+            sumPrecip += parseInt(day.precipitacion);
+            if (day.precipitacionNivel > maxNivelPrecip) maxNivelPrecip = day.precipitacionNivel;
+            diasValidos++;
+        }
+        
+        const avgTempMax = Math.round(sumTempMax / diasValidos) + " C";
+        const avgTempMin = Math.round(sumTempMin / diasValidos) + " C";
+        const avgNubosidad = sumNubosidad / diasValidos;
+        const avgVientoVel = Math.round(sumVientoVel / diasValidos);
+        const avgRafagaVel = Math.round(sumRafagaVel / diasValidos);
+        const avgPrecip = Math.round(sumPrecip / diasValidos);
+        
+        const vientoCategoria = obtenerCategoriaViento(avgVientoVel);
+        const rafagaCategoria = obtenerCategoriaRafaga(avgRafagaVel);
+        const precipInfo = clasificarPrecipitacion(avgPrecip);
+        const nubosidadTexto = clasificarNubosidad(avgNubosidad);
+        const recomendacionTormenta = obtenerRecomendacionTormenta(maxNivelPrecip);
+        
+        const primerDia = storedData.daily[0]?.labelGrafico || "";
+        const ultimoDia = storedData.daily[2]?.labelGrafico || storedData.daily[1]?.labelGrafico || primerDia;
+        
+        let texto = `🌤️ PRONÓSTICO DEL TIEMPO • ${lugar.toUpperCase()}\n`;
+        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        texto += `📅 Fecha del informe: ${fechaStr}\n`;
+        texto += `📆 Período pronosticado: ${primerDia} - ${ultimoDia}\n\n`;
+        texto += `***PRÓXIMOS 3 DÍAS***\n`;
+        texto += `Se esperan temperaturas máximas promedio de ${avgTempMax} y mínimas promedio de ${avgTempMin}, `;
+        texto += `se esperan cielos ${nubosidadTexto} con espacios de sol dispersos, `;
+        texto += `vientos promedio de ${avgVientoVel} km/h (${vientoCategoria}), con ráfagas promedio de ${avgRafagaVel} km/h (${rafagaCategoria}), `;
+        texto += `se esperan precipitaciones de tipo ${precipInfo.descripcion}\n\n`;
+        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        texto += `📊 DATOS PROMEDIO DEL PERÍODO:\n`;
+        texto += `• Temperatura máxima promedio: ${avgTempMax}\n`;
+        texto += `• Temperatura mínima promedio: ${avgTempMin}\n`;
+        texto += `• Viento promedio: ${avgVientoVel} km/h (${vientoCategoria})\n`;
+        texto += `• Ráfagas promedio: ${avgRafagaVel} km/h (${rafagaCategoria})\n`;
+        texto += `• Nubosidad promedio: ${Math.round(avgNubosidad)}%\n`;
+        texto += `• Precipitación promedio: ${avgPrecip} mm\n\n`;
+        texto += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+        texto += `📌 RECOMENDACIONES:\n`;
+        texto += `• Índice UV máximo esperado: ${Math.round(storedData.uvMaxGeneral)} - Nivel ${uvRecomendacion.nivel}\n`;
+        texto += `• ${uvRecomendacion.recomendacion}\n`;
+        if (recomendacionTormenta) {
+            texto += recomendacionTormenta;
+        }
+        texto += `• Precaución por eventos de precipitaciones en los próximos días.\n`;
+        texto += `• Se recomienda mantenerse informado sobre las condiciones meteorológicas.\n\n`;
+        texto += `📝 OBSERVACIONES ADICIONALES: ${obs}\n\n`;
+        texto += `🔮 Fuente: Open-Meteo (datos en tiempo real)\n`;
+        texto += `🕒 Actualización: ${storedData.timestamp}\n`;
+        
+        resultadoDiv.innerText = texto;
+        actualizarGraficos3Dias();
+        return texto;
+    }
+    
+    async function cargarClima() {
+        const query = lugarInput.value.trim();
+        if (!query) { mostrarEstado("❌ Escriba un lugar", true); return; }
+        mostrarEstado("🔍 Buscando...");
+        try {
+            const geo = await geocode(query);
+            const weather = await fetchWeather(geo.lat, geo.lon);
+            storedData = { 
+                lugarNombre: geo.nombre, 
+                current: weather.current, 
+                daily: weather.daily, 
+                hourly: weather.hourly,
+                horas: weather.horas,
+                temps: weather.temps,
+                precips: weather.precips,
+                uvMaxGeneral: weather.uvMaxGeneral, 
+                timestamp: new Date().toLocaleString() 
+            };
+            renderUI(weather);
+            origenInfoSpan.innerHTML = `✅ ${geo.nombre} · Datos cargados | UV máx: ${Math.round(weather.uvMaxGeneral)}`;
+            mostrarEstado("✔️ Datos cargados correctamente");
+            actualizarGraficos1Dia();
+        } catch (err) { mostrarEstado(`❌ Error: ${err.message}`, true); }
+    }
+    
+    buscarBtn.addEventListener('click', cargarClima);
+    informe1DiaBtn.addEventListener('click', generarInforme1Dia);
+    informe3DiasBtn.addEventListener('click', generarInforme3Dias);
+    copiarBtn.addEventListener('click', () => { const txt = resultadoDiv.innerText; if (txt) { navigator.clipboard.writeText(txt); mostrarEstado("📋 Copiado"); } });
+    exportarPdfBtn.addEventListener('click', async () => {
+        if (!storedData.current.temperatura) { mostrarEstado("⚠️ Primero obtenga datos", true); return; }
+        mostrarEstado("📑 Generando PDF...");
+        await new Promise(r => setTimeout(r, 300));
+        
+        const tempCanvas = document.getElementById('tempChart');
+        const precipCanvas = document.getElementById('precipChart');
+        const tempImg = tempCanvas.toDataURL('image/png');
+        const precipImg = precipCanvas.toDataURL('image/png');
+        const lugar = storedData.lugarNombre;
+        const fecha = new Date().toLocaleString('es-ES', { dateStyle: 'full', timeStyle: 'short' });
+        
+        const container = document.createElement('div');
+        container.style.position = 'absolute'; container.style.left = '-9999px'; container.style.top = '0';
+        container.style.width = '750px'; container.style.background = 'white'; container.style.padding = '20px';
+        container.style.fontFamily = 'system-ui, sans-serif';
+        
+        container.innerHTML = `
+            <div style="text-align:center; border-bottom:2px solid #ffb347; padding-bottom:12px; margin-bottom:20px;">
+                <h2 style="color:#0f2f3b;">🌦️ INFORME DE PRONÓSTICO</h2>
+                <p style="color:#2c6e8f;">${lugar.toUpperCase()} · VariClim</p>
+                <p style="font-size:9px;">Generado: ${fecha}</p>
+            </div>
+            <div style="margin-bottom:15px;"><h3 style="font-size:13px;">📡 DATOS ACTUALES</h3><div style="display:flex; flex-wrap:wrap; gap:8px;">${['temperatura','humedad','viento','rafagas','probPrecip','precipTotal','nubosidad'].map(k => `<div style="background:#e8f0f5; border-radius:8px; padding:5px 10px;"><strong>${k==='temperatura'?'🌡️':k==='humedad'?'💧':k==='viento'?'💨':k==='rafagas'?'💨⚡':k==='probPrecip'?'☔':k==='precipTotal'?'🌧️':'☁️'}</strong> ${storedData.current[k]}</div>`).join('')}</div></div>
+            <div><h3 style="font-size:13px;">📈 GRÁFICOS EVOLUTIVOS</h3><div style="margin-bottom:20px;"><img src="${tempImg}" style="width:100%; max-width:500px;"></div><div><img src="${precipImg}" style="width:100%; max-width:500px;"></div></div>
+            <div style="text-align:center; font-size:8px; margin-top:15px;">VariClim 2026 · Datos en tiempo real</div>
+        `;
+        
+        document.body.appendChild(container);
+        try {
+            const canvas = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const imgWidth = 190;
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, 5, imgWidth, (canvas.height * imgWidth) / canvas.width);
+            pdf.save(`pronostico_${lugar.replace(/\s/g, '_')}.pdf`);
+            mostrarEstado("✅ PDF descargado");
+        } catch(err) { mostrarEstado("❌ Error PDF", true); }
+        finally { document.body.removeChild(container); }
+    });
+    
+    window.addEventListener('DOMContentLoaded', () => setTimeout(cargarClima, 300));
+</script>
+</body>
+</html>
