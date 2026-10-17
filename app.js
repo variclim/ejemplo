@@ -15,7 +15,6 @@ const catalogosDefault = {
     proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José']
 };
 
-// Única cuenta por defecto: El Administrador (los demás se crean desde su panel)
 const usuarioAdminDefault = [
     { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
 ];
@@ -225,12 +224,12 @@ function generarVistaEditor() {
     `;
 }
 
-// ================= VISTA ADMINISTRADOR =================
+// ================= VISTA ADMINISTRADOR (CORREGIDA Y COMPLETA) =================
 function generarVistaAdmin() {
     let htmlTareasAdmin = dbTareas.map(t => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
             <div>
-                <span class="font-bold">${t.titulo}</span> <span class="text-xs text-slate-500">(${t.area} / ${t.proyecto}) — Avance: ${t.avance}%</span>
+                <span class="font-bold">${t.titulo}</span> <span class="text-xs text-slate-500">(${t.area} / ${t.proyecto}) — Avance: ${t.avance}% — Resp: ${t.responsable}</span>
             </div>
             <button onclick="eliminarTareaAdmin(${t.id})" class="bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-lg">Eliminar</button>
         </div>
@@ -246,6 +245,18 @@ function generarVistaAdmin() {
                 <button onclick="actualizarPasswordUser(${u.id})" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold">Cambiar</button>
                 ${u.rol !== 'admin' ? `<button onclick="eliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold">Eliminar</button>` : ''}
             </div>
+        </div>
+    `).join('');
+
+    let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
+    let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+
+    let htmlTareasAdminCreacion = dbTareas.map(t => `
+        <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
+            <div>
+                <span class="font-bold">${t.titulo}</span> <span class="text-xs text-slate-500">(${t.area} / ${t.proyecto}) — Estado: ${t.estado}</span>
+            </div>
+            <button onclick="eliminarTareaAdmin(${t.id})" class="bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-lg">Eliminar</button>
         </div>
     `).join('');
 
@@ -304,11 +315,25 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
+            <!-- Módulo de Tareas del Administrador -->
+            <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="font-extrabold text-slate-900 text-lg">📝 Registrar Nueva Tarea</h3>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <input type="text" id="adminTareaTitulo" placeholder="Título de la tarea" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <select id="adminTareaArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${optionsAreas}</select>
+                    <select id="adminTareaProyecto" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${optionsProyectos}</select>
+                    <input type="date" id="adminTareaFecha" class="px-4 py-2.5 border rounded-xl text-sm">
+                </div>
+                <button onclick="agregarTareaAdminCreador()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow transition">Guardar Tarea</button>
+            </div>
+
+            <!-- Gestión de Usuarios Registrados -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios Registrados</h3>
                 <div class="space-y-3">${htmlUsuariosAdmin}</div>
             </div>
 
+            <!-- Control Total de Tareas -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">📋 Control Total de Tareas</h3>
                 <div class="space-y-3">${htmlTareasAdmin}</div>
@@ -341,6 +366,23 @@ async function eliminarUsuario(id) {
         await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
         renderizarInterfazPorRol();
     }
+}
+
+async function agregarTareaAdminCreador() {
+    const titulo = document.getElementById('adminTareaTitulo').value.trim();
+    const area = document.getElementById('adminTareaArea').value;
+    const proyecto = document.getElementById('adminTareaProyecto').value;
+    const fechaLimite = document.getElementById('adminTareaFecha').value;
+
+    if (!titulo || !fechaLimite) {
+        mostrarToast('Completa el título y la fecha límite.', 'error');
+        return;
+    }
+
+    dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: 'Administrador' });
+    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar tarea por admin');
+    mostrarToast('Tarea creada exitosamente.');
+    renderizarInterfazPorRol();
 }
 
 async function agregarTareaEditor() {
