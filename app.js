@@ -6,12 +6,10 @@ const GITHUB_BRANCH = "main";
 let tokenAdmin = sessionStorage.getItem('ae_github_token') || "";
 let sesionActual = JSON.parse(sessionStorage.getItem('ae_sesion')) || null;
 
-// Bases de datos locales en memoria sincronizadas con GitHub
 let dbUsuarios = [];
 let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: ['Proyecto General SLP'] };
 let dbTareas = [];
 
-// Catálogos por defecto si GitHub está vacío
 const catalogosDefault = {
     areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'],
     proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José']
@@ -46,16 +44,24 @@ function mostrarToast(mensaje, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
-// ================= SINCRONIZACIÓN CON GITHUB =================
+// ================= SINCRONIZACIÓN CON GITHUB Y LOCALSTORAGE =================
 async function leerArchivoGitHub(ruta) {
+    // Primero revisamos si hay un respaldo local reciente
+    const local = localStorage.getItem(`ae_local_${ruta}`);
+    if (local) {
+        try { return JSON.parse(local); } catch(e){}
+    }
+
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}`;
     try {
         const res = await fetch(url);
         if (res.ok) {
             const data = await res.json();
-            return JSON.parse(decodeURIComponent(escape(atob(data.content))));
+            const contenido = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+            localStorage.setItem(`ae_local_${ruta}`, JSON.stringify(contenido));
+            return contenido;
         }
-    } catch (e) { console.log(`Error leyendo ${ruta}`); }
+    } catch (e) { console.log(`Usando respaldo para ${ruta}`); }
     return null;
 }
 
@@ -69,14 +75,14 @@ async function cargarDatosDesdeGitHub() {
 }
 
 async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
-    if (!tokenAdmin && sesionActual?.rol === 'admin') {
-        mostrarToast('Se requiere el Token de GitHub para guardar cambios permanentes.', 'error');
-        return false;
-    }
-    
-    // Si es editor o visualizador, solo guardamos en memoria/local temporalmente si no tienen token
+    // Guardar siempre de forma local para garantizar fluidez inmediata
+    localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
+
     const tokenUsar = tokenAdmin || sessionStorage.getItem('ae_github_token');
-    if (!tokenUsar) return true; // Permite operar localmente si no configuró token
+    if (!tokenUsar) {
+        mostrarToast('Guardado local exitoso (Sin token activo para sincronizar en la nube).');
+        return true;
+    }
 
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
     let sha = "";
@@ -93,10 +99,10 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     });
 
     if (resPut.ok) {
-        mostrarToast('¡Base de datos en GitHub actualizada!');
+        mostrarToast('¡Sincronizado con GitHub con éxito!');
         return true;
     } else {
-        mostrarToast('Error al sincronizar con GitHub. Verifica tu token.', 'error');
+        mostrarToast('Cambios guardados localmente (Token de GitHub rechazado o sin permisos de repo).', 'error');
         return false;
     }
 }
@@ -226,11 +232,8 @@ function generarVistaEditor() {
     `;
 }
 
-// ================= VISTA ADMINISTRADOR (NIVEL 3 - CONTROL TOTAL) =================
+// ================= VISTA ADMINISTRADOR (NIVEL 3) =================
 function generarVistaAdmin() {
-    let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
-    let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
-
     let htmlTareasAdmin = dbTareas.map(t => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
             <div>
@@ -254,7 +257,6 @@ function generarVistaAdmin() {
 
     return `
         <div class="space-y-8">
-            <!-- Estadísticas / Informes -->
             <div class="grid sm:grid-cols-3 gap-4">
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
                     <span class="text-xs font-bold text-slate-400 uppercase">Total Tareas</span>
@@ -270,7 +272,6 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
-            <!-- Gestión de Catálogos (Áreas y Proyectos) -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <h3 class="font-extrabold text-slate-900 text-lg">📁 Gestión de Catálogos</h3>
                 <div class="grid sm:grid-cols-2 gap-6">
@@ -293,13 +294,11 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
-            <!-- Gestión de Usuarios -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios y Contraseñas</h3>
                 <div class="space-y-3">${htmlUsuariosAdmin}</div>
             </div>
 
-            <!-- Control de Tareas -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">📋 Control Total de Tareas</h3>
                 <div class="space-y-3">${htmlTareasAdmin}</div>
@@ -308,7 +307,7 @@ function generarVistaAdmin() {
     `;
 }
 
-// ================= ACCIONES DE EDITORES Y ADMIN =================
+// ================= ACCIONES =================
 async function agregarTareaEditor() {
     const titulo = document.getElementById('nuevaTareaTitulo').value.trim();
     const area = document.getElementById('nuevaTareaArea').value;
@@ -320,17 +319,7 @@ async function agregarTareaEditor() {
         return;
     }
 
-    dbTareas.push({
-        id: Date.now(),
-        titulo,
-        area,
-        proyecto,
-        estado: 'Pendiente',
-        avance: 0,
-        fechaLimite,
-        responsable: sesionActual.nombre
-    });
-
+    dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: sesionActual.nombre });
     await guardarEnGitHub('tareas.json', dbTareas, 'Agregar nueva tarea');
     mostrarToast('Tarea agregada exitosamente.');
     renderizarInterfazPorRol();
@@ -342,7 +331,7 @@ async function actualizarAvanceTarea(id, nuevoAvance) {
         tarea.avance = parseInt(nuevoAvance) || 0;
         if (tarea.avance >= 100) { tarea.avance = 100; tarea.estado = 'Concluida'; }
         else if (tarea.estado === 'Concluida') { tarea.estado = 'Pendiente'; }
-        await guardarEnGitHub('tareas.json', dbTareas, 'Actualizar avance de tarea');
+        await guardarEnGitHub('tareas.json', dbTareas, 'Actualizar avance');
         renderizarInterfazPorRol();
     }
 }
@@ -352,7 +341,7 @@ async function toggleConcluirTarea(id) {
     if (tarea) {
         tarea.estado = tarea.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
         if (tarea.estado === 'Concluida') tarea.avance = 100;
-        await guardarEnGitHub('tareas.json', dbTareas, 'Cambiar estado de tarea');
+        await guardarEnGitHub('tareas.json', dbTareas, 'Cambiar estado');
         renderizarInterfazPorRol();
     }
 }
@@ -360,7 +349,7 @@ async function toggleConcluirTarea(id) {
 async function eliminarTareaAdmin(id) {
     if (confirm('¿Eliminar esta tarea permanentemente?')) {
         dbTareas = dbTareas.filter(t => t.id !== id);
-        await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea admin');
+        await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea');
         renderizarInterfazPorRol();
     }
 }
@@ -369,7 +358,7 @@ async function agregarAreaCatalogo() {
     const area = document.getElementById('nuevoAreaInput').value.trim();
     if (area && !dbCatalogos.areas.includes(area)) {
         dbCatalogos.areas.push(area);
-        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar nueva área');
+        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar área');
         mostrarToast('Área agregada.');
         renderizarInterfazPorRol();
     }
@@ -379,7 +368,7 @@ async function agregarProyectoCatalogo() {
     const proj = document.getElementById('nuevoProyectoInput').value.trim();
     if (proj && !dbCatalogos.proyectos.includes(proj)) {
         dbCatalogos.proyectos.push(proj);
-        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar nuevo proyecto');
+        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar proyecto');
         mostrarToast('Proyecto agregado.');
         renderizarInterfazPorRol();
     }
@@ -390,7 +379,7 @@ async function actualizarPasswordUser(id) {
     const user = dbUsuarios.find(u => u.id === id);
     if (user && nuevoPass) {
         user.pass = nuevoPass;
-        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar contraseña de usuario');
+        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar password');
         mostrarToast('Contraseña actualizada con éxito.');
     }
 }
