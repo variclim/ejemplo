@@ -15,7 +15,7 @@
         <!-- Notificación Flotante -->
         <div id="toast" class="fixed top-5 right-5 z-50 hidden px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all"></div>
 
-        <!-- Navbar -->
+        <!-- Navbar Principal -->
         <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
             <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
@@ -29,7 +29,7 @@
             </div>
         </nav>
 
-        <!-- Contenedor Principal Dinámico por Pestañas y Roles -->
+        <!-- Contenedor Principal Dinámico -->
         <main id="appContainer" class="space-y-6">
             <div class="bg-white p-16 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4 max-w-xl mx-auto">
                 <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">🔒</div>
@@ -55,10 +55,6 @@
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Contraseña</label>
                     <input type="password" id="loginPassword" value="admin123" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
-                </div>
-                <div id="tokenContainer">
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (Admin)</label>
-                    <input type="password" id="loginTokenGitHub" placeholder="ghp_..." class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
             </div>
             <div class="flex gap-3 pt-2">
