@@ -18,5 +18,15 @@
     "avance": 100,
     "fechaLimite": "2026-10-16",
     "responsable": "Administrador"
+  },
+  {
+    "id": 1792210662196,
+    "titulo": "ggggg",
+    "area": "Administracion",
+    "proyecto": "Patria",
+    "estado": "Pendiente",
+    "avance": 0,
+    "fechaLimite": "2026-10-06",
+    "responsable": "uno"
   }
 ]
