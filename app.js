@@ -89,7 +89,7 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 
     if (!tokenAdmin) {
-        mostrarToast('Acción detenida: Se requiere configurar el Token de GitHub al iniciar sesión.', 'error');
+        mostrarToast('Acción detenida: Se requiere configurar el Token de GitHub del Administrador.', 'error');
         return false;
     }
 
@@ -138,7 +138,6 @@ async function procesarLogin() {
         if (token && encontrado.rol === 'admin') {
             tokenAdmin = token;
             sessionStorage.setItem('ae_github_token', token);
-            // Guardar el token encriptado en el perfil del admin automáticamente
             encontrado.tokenHash = encriptarPass(token);
             await guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
         } else if (encontrado.tokenHash) {
@@ -162,7 +161,7 @@ function cerrarSesion() {
     location.reload();
 }
 
-// ================= RENDERIZADO POR PESTAÑAS =================
+// ================= RENDERIZADO POR PESTAÑAS Y ROLES =================
 function cambiarPestana(pestana) {
     pestanaActiva = pestana;
     renderizarInterfazPorRol();
@@ -184,11 +183,13 @@ function renderizarInterfazPorRol() {
     const container = document.getElementById('appContainer');
     if (!container) return;
 
+    // Restricción de Área: Admin ve todo, Editor y Visualizador solo su área
     let tareasVisibles = dbTareas;
     if (sesionActual.rol !== 'admin') {
         tareasVisibles = dbTareas.filter(t => t.area === sesionActual.area);
     }
 
+    // Construcción de Pestañas según permisos de rol
     let tabsHTML = `
         <div class="flex flex-wrap gap-2 bg-white p-2.5 rounded-2xl border shadow-sm no-print">
             <button onclick="cambiarPestana('tareas')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'tareas' ? 'bg-blue-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">📋 Gestión de Tareas</button>
@@ -196,6 +197,7 @@ function renderizarInterfazPorRol() {
             <button onclick="cambiarPestana('informes')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'informes' ? 'bg-blue-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">📊 Informes Ejecutivos</button>
     `;
 
+    // Solo el Administrador ve la pestaña de gestión de usuarios
     if (sesionActual.rol === 'admin') {
         tabsHTML += `<button onclick="cambiarPestana('usuarios')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'usuarios' ? 'bg-purple-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">👥 Gestión de Usuarios</button>`;
     }
@@ -211,7 +213,7 @@ function renderizarInterfazPorRol() {
     container.innerHTML = tabsHTML + contenidoTab;
 }
 
-// ================= VISTA 1: TAREAS =================
+// ================= VISTA 1: TAREAS (RESPECTO A ROLES) =================
 function generarVistaTareas(tareas) {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
     let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
@@ -223,6 +225,25 @@ function generarVistaTareas(tareas) {
                 <span class="text-xs font-bold">${t.avance}%</span>
             </div>
         `;
+
+        // Visualizadores NO pueden editar avance ni cambiar estado
+        let controlesAccion = "";
+        if (sesionActual.rol === 'visualizador') {
+            controlesAccion = `
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700">${t.estado}</span>
+                </div>
+            `;
+        } else {
+            // Editores y Admin pueden modificar avance y estado
+            controlesAccion = `
+                <div class="flex items-center gap-2">
+                    <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1.5 border rounded-xl text-xs text-center font-bold">
+                    <button onclick="toggleConcluir(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">${t.estado}</button>
+                    ${sesionActual.rol === 'admin' ? `<button onclick="eliminarTarea(${t.id})" class="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1">✕</button>` : ''}
+                </div>
+            `;
+        }
 
         return `
             <div class="p-5 bg-white rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -236,17 +257,14 @@ function generarVistaTareas(tareas) {
                 </div>
                 <div class="flex items-center gap-4 w-full sm:w-auto justify-between">
                     ${semaforo}
-                    <div class="flex items-center gap-2">
-                        <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1.5 border rounded-xl text-xs text-center font-bold">
-                        <button onclick="toggleConcluir(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">${t.estado}</button>
-                        ${sesionActual.rol === 'admin' ? `<button onclick="eliminarTarea(${t.id})" class="text-rose-600 hover:text-rose-800 text-xs font-bold px-2 py-1">✕</button>` : ''}
-                    </div>
+                    ${controlesAccion}
                 </div>
             </div>
         `;
     }).join('');
 
     let formularioNuevaTarea = "";
+    // Solo Admin y Editores pueden crear tareas
     if (sesionActual.rol === 'admin' || sesionActual.rol === 'editor') {
         formularioNuevaTarea = `
             <div class="bg-white p-6 rounded-3xl border shadow-sm space-y-4">
@@ -270,9 +288,11 @@ function generarVistaTareas(tareas) {
     `;
 }
 
-// ================= VISTA 2: GESTIÓN DE USUARIOS =================
+// ================= VISTA 2: GESTIÓN DE USUARIOS (SOLO ADMIN) =================
 function generarVistaUsuarios() {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+    const adminActualObj = dbUsuarios.find(u => u.rol === 'admin');
+    const tokenConfigurado = adminActualObj && adminActualObj.tokenHash ? "🔒 Token de GitHub Configurado y Encriptado" : "⚠️ Sin Token Configurado";
 
     let htmlUsuarios = dbUsuarios.map(u => `
         <div class="p-4 bg-white rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
@@ -289,6 +309,18 @@ function generarVistaUsuarios() {
 
     return `
         <div class="space-y-8">
+            <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-extrabold text-lg text-slate-900">🔑 Token de GitHub del Administrador</h3>
+                    <span class="text-xs font-bold px-3 py-1 rounded-full ${adminActualObj?.tokenHash ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${tokenConfigurado}</span>
+                </div>
+                <p class="text-xs text-slate-500">Ingresa tu Token (PAT) de GitHub para permitir la sincronización en la nube.</p>
+                <div class="flex gap-3">
+                    <input type="password" id="adminTokenInput" placeholder="ghp_..." class="w-full px-4 py-2.5 border rounded-xl text-sm">
+                    <button onclick="guardarTokenAdmin()" class="bg-slate-900 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow whitespace-nowrap">Encriptar y Guardar Token</button>
+                </div>
+            </div>
+
             <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
                 <h3 class="font-extrabold text-lg">➕ Registrar Nuevo Usuario</h3>
                 <div class="grid sm:grid-cols-4 gap-3">
@@ -343,7 +375,7 @@ function generarVistaCalendario(tareas) {
     `;
 }
 
-// ================= VISTA 4: INFORMES =================
+// ================= VISTA 4: INFORMES (RESTRICCIÓN DE IMPRESIÓN PARA EDITORES) =================
 function generarVistaInformes(tareas) {
     let total = tareas.length;
     let concluidas = tareas.filter(t => t.estado === 'Concluida').length;
@@ -362,6 +394,18 @@ function generarVistaInformes(tareas) {
         </tr>
     `).join('');
 
+    // Solo Admin y Visualizadores (según regla de negocio de impresión exclusiva para Admin) pueden exportar/imprimir
+    // Editores NO pueden imprimir nada.
+    let botonesAccionInforme = "";
+    if (sesionActual.rol === 'admin') {
+        botonesAccionInforme = `
+            <div class="flex gap-3">
+                <button onclick="exportarCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow">📥 Exportar CSV</button>
+                <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow">🖨️ Imprimir Reporte Oficial</button>
+            </div>
+        `;
+    }
+
     return `
         <div class="space-y-6">
             <div class="flex justify-between items-center no-print bg-white p-6 rounded-3xl border shadow-sm">
@@ -369,10 +413,7 @@ function generarVistaInformes(tareas) {
                     <h2 class="text-xl font-extrabold text-slate-900">Informe Ejecutivo Institucional</h2>
                     <p class="text-xs text-slate-500">Reporte oficial formateado para directivos.</p>
                 </div>
-                <div class="flex gap-3">
-                    <button onclick="exportarCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow">📥 Exportar CSV</button>
-                    <button onclick="window.print()" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-5 py-2.5 rounded-xl shadow">🖨️ Imprimir Reporte Oficial</button>
-                </div>
+                ${botonesAccionInforme}
             </div>
 
             <div id="printableReport" class="bg-white p-10 rounded-3xl border shadow-sm space-y-8">
@@ -412,6 +453,21 @@ function generarVistaInformes(tareas) {
 }
 
 // ================= ACCIONES =================
+async function guardarTokenAdmin() {
+    const rawToken = document.getElementById('adminTokenInput').value.trim();
+    if (!rawToken) return alert('Ingresa un token válido.');
+
+    const adminObj = dbUsuarios.find(u => u.rol === 'admin');
+    if (adminObj) {
+        adminObj.tokenHash = encriptarPass(rawToken);
+        tokenAdmin = rawToken;
+        sessionStorage.setItem('ae_github_token', tokenAdmin);
+        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar token encriptado de administrador');
+        mostrarToast('¡Token de GitHub encriptado y guardado con éxito!');
+        renderizarInterfazPorRol();
+    }
+}
+
 async function cambiarPasswordUsuario(id) {
     const inputPass = document.getElementById(`newPass_${id}`).value.trim();
     if (!inputPass) return alert('Ingresa la nueva contraseña.');
@@ -426,6 +482,7 @@ async function cambiarPasswordUsuario(id) {
 }
 
 async function crearUsuario() {
+    if (sesionActual.rol !== 'admin') return alert('Acción no permitida.');
     const nombre = document.getElementById('uNombre').value.trim();
     const usuario = document.getElementById('uLogin').value.trim();
     const pass = document.getElementById('uPass').value.trim();
@@ -451,6 +508,7 @@ async function crearUsuario() {
 }
 
 async function eliminarUsuario(id) {
+    if (sesionActual.rol !== 'admin') return;
     if(confirm('¿Eliminar usuario?')) {
         dbUsuarios = dbUsuarios.filter(u => u.id !== id);
         await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
@@ -459,6 +517,7 @@ async function eliminarUsuario(id) {
 }
 
 async function agregarArea() {
+    if (sesionActual.rol !== 'admin') return;
     const val = document.getElementById('catArea').value.trim();
     if (val && !dbCatalogos.areas.includes(val)) {
         dbCatalogos.areas.push(val);
@@ -468,6 +527,7 @@ async function agregarArea() {
 }
 
 async function agregarProyecto() {
+    if (sesionActual.rol !== 'admin') return;
     const val = document.getElementById('catProj').value.trim();
     if (val && !dbCatalogos.proyectos.includes(val)) {
         dbCatalogos.proyectos.push(val);
@@ -477,8 +537,9 @@ async function agregarProyecto() {
 }
 
 async function crearTarea() {
+    if (sesionActual.rol === 'visualizador') return alert('Los visualizadores no pueden crear tareas.');
     const titulo = document.getElementById('tTitulo').value.trim();
-    const area = document.getElementById('tArea').value;
+    const area = sesionActual.rol === 'admin' ? document.getElementById('tArea').value : sesionActual.area;
     const proyecto = document.getElementById('tProyecto').value;
     const fechaLimite = document.getElementById('tFecha').value;
 
@@ -489,6 +550,7 @@ async function crearTarea() {
 }
 
 async function actualizarAvance(id, val) {
+    if (sesionActual.rol === 'visualizador') return alert('Acción denegada: Los visualizadores solo pueden consultar.');
     const t = dbTareas.find(x => x.id === id);
     if (t) {
         t.avance = parseInt(val) || 0;
@@ -500,6 +562,7 @@ async function actualizarAvance(id, val) {
 }
 
 async function toggleConcluir(id) {
+    if (sesionActual.rol === 'visualizador') return alert('Acción denegada: Los visualizadores solo pueden consultar.');
     const t = dbTareas.find(x => x.id === id);
     if (t) {
         t.estado = t.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
@@ -510,6 +573,7 @@ async function toggleConcluir(id) {
 }
 
 async function eliminarTarea(id) {
+    if (sesionActual.rol !== 'admin') return alert('Solo el administrador puede eliminar tareas.');
     if(confirm('¿Eliminar tarea?')) {
         dbTareas = dbTareas.filter(t => t.id !== id);
         await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea');
@@ -518,6 +582,7 @@ async function eliminarTarea(id) {
 }
 
 function exportarCSV() {
+    if (sesionActual.rol !== 'admin') return alert('Acción restringida al Administrador.');
     let csv = "data:text/csv;charset=utf-8,\uFEFFID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
     dbTareas.forEach(t => csv += `${t.id},"${t.titulo}","${t.area}","${t.proyecto}",${t.estado},${t.avance}%,${t.fechaLimite},"${t.responsable}"\n`);
     const link = document.createElement("a");
