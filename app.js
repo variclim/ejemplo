@@ -7,7 +7,7 @@ let tokenAdmin = sessionStorage.getItem('ae_github_token') || "";
 let sesionActual = JSON.parse(sessionStorage.getItem('ae_sesion')) || null;
 
 let dbUsuarios = [];
-let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José'] };
+let dbCatalogos = { areas: [], proyectos: [] };
 let dbTareas = [];
 
 const catalogosDefault = {
@@ -46,7 +46,7 @@ async function leerArchivoGitHub(ruta) {
             return JSON.parse(decoded);
         }
     } catch (e) {
-        console.log(`Error al leer ${ruta} de GitHub, usando respaldo local.`);
+        console.log(`Error al leer ${ruta} de GitHub.`);
     }
     return null;
 }
@@ -57,7 +57,8 @@ async function cargarDatosDesdeGitHub() {
         dbUsuarios = Array.isArray(usuariosRemotos) && usuariosRemotos.length > 0 ? usuariosRemotos : usuarioAdminDefault;
 
         const catalogosRemotos = await leerArchivoGitHub('areas_proyectos.json');
-        dbCatalogos = catalogosRemotos && catalogosRemotos.areas ? catalogosRemotos : catalogosDefault;
+        dbCatalogos.areas = (catalogosRemotos && Array.isArray(catalogosRemotos.areas)) ? catalogosRemotos.areas : catalogosDefault.areas;
+        dbCatalogos.proyectos = (catalogosRemotos && Array.isArray(catalogosRemotos.proyectos)) ? catalogosRemotos.proyectos : catalogosDefault.proyectos;
 
         const tareasRemotas = await leerArchivoGitHub('tareas.json');
         dbTareas = Array.isArray(tareasRemotas) ? tareasRemotas : [
@@ -81,14 +82,12 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     let sha = "";
 
     try {
-        const resGet = await fetch(url, {
-            headers: { "Authorization": `token ${tokenAdmin}` }
-        });
+        const resGet = await fetch(url, { headers: { "Authorization": `token ${tokenAdmin}` } });
         if (resGet.ok) {
             const data = await resGet.json();
             sha = data.sha;
         }
-    } catch (e) { console.log("Archivo nuevo o sin SHA previo"); }
+    } catch (e) {}
 
     const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
 
@@ -178,7 +177,7 @@ function renderizarInterfazPorRol() {
     }
 }
 
-// ================= VISTA VISUALIZADOR =================
+// ================= VISTAS =================
 function generarVistaVisualizador() {
     let htmlTareas = dbTareas.map(t => `
         <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -211,10 +210,9 @@ function generarVistaVisualizador() {
     `;
 }
 
-// ================= VISTA EDITOR =================
 function generarVistaEditor() {
-    let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
-    let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+    let optionsAreas = (dbCatalogos.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+    let optionsProyectos = (dbCatalogos.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
 
     let htmlTareasEditor = dbTareas.map(t => `
         <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -248,7 +246,6 @@ function generarVistaEditor() {
     `;
 }
 
-// ================= VISTA ADMINISTRADOR =================
 function generarVistaAdmin() {
     let htmlTareasAdmin = dbTareas.map(t => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
@@ -272,8 +269,8 @@ function generarVistaAdmin() {
         </div>
     `).join('');
 
-    let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
-    let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+    let optionsAreas = (dbCatalogos.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+    let optionsProyectos = (dbCatalogos.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
 
     return `
         <div class="space-y-8">
@@ -315,7 +312,7 @@ function generarVistaAdmin() {
                             <input type="text" id="nuevoAreaInput" placeholder="Ej. Investigación" class="px-4 py-2 border rounded-xl text-sm w-full">
                             <button onclick="agregarAreaCatalogo()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">Agregar</button>
                         </div>
-                        <p class="text-xs text-slate-500">Áreas actuales: ${dbCatalogos.areas.join(', ')}</p>
+                        <p class="text-xs text-slate-500">Áreas actuales: ${(dbCatalogos.areas || []).join(', ')}</p>
                     </div>
                     <div class="space-y-3">
                         <label class="block text-sm font-semibold text-slate-700">Nuevo Proyecto</label>
@@ -323,7 +320,7 @@ function generarVistaAdmin() {
                             <input type="text" id="nuevoProyectoInput" placeholder="Ej. Inventario Forestal" class="px-4 py-2 border rounded-xl text-sm w-full">
                             <button onclick="agregarProyectoCatalogo()" class="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold">Agregar</button>
                         </div>
-                        <p class="text-xs text-slate-500">Proyectos actuales: ${dbCatalogos.proyectos.join(', ')}</p>
+                        <p class="text-xs text-slate-500">Proyectos actuales: ${(dbCatalogos.proyectos || []).join(', ')}</p>
                     </div>
                 </div>
             </div>
