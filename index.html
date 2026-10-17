@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EvaluaPro Platform | Sistema Integral de Evaluaciones</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen py-10 px-4">
+
+    <div class="max-w-5xl mx-auto space-y-6">
+
+        <!-- Notificación Flotante -->
+        <div id="toast" class="fixed top-5 right-5 z-50 hidden transition-all duration-300 transform translate-y-0 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm"></div>
+
+        <!-- Navbar Principal -->
+        <nav class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-md">EP</div>
+                <div>
+                    <h1 class="font-extrabold text-slate-900 tracking-tight">EvaluaPro Platform</h1>
+                    <p class="text-xs text-slate-500">Sistema Integral con Base de Datos en GitHub</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+                <button onclick="cambiarVista('alumno')" id="btnVistaAlumno" class="px-4 py-2 text-sm font-semibold rounded-xl bg-blue-600 text-white shadow-sm transition">Portal Alumnos</button>
+                <button onclick="verificarAdmin()" id="btnVistaAdmin" class="px-4 py-2 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-200 transition">Panel Administrador</button>
+            </div>
+        </nav>
+
+        <!-- PORTAL ALUMNO -->
+        <div id="vistaAlumno" class="space-y-6">
+            <div id="seccionSeleccionExamen" class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6 text-center">
+                <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto shadow-inner">📝</div>
+                <div class="max-w-xl mx-auto space-y-2">
+                    <h2 class="text-2xl font-extrabold text-slate-900">Selecciona una Evaluación</h2>
+                    <p class="text-sm text-slate-500">Elige el examen que deseas presentar e ingresa tus credenciales.</p>
+                </div>
+                <div id="listaExamenesDisponibles" class="grid gap-4 max-w-xl mx-auto pt-4 text-left"></div>
+            </div>
+
+            <div id="seccionInscripcion" class="hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6 max-w-xl mx-auto">
+                <button onclick="regresarASeleccionExamen()" class="text-sm text-blue-600 hover:underline font-semibold flex items-center gap-1">← Volver a exámenes</button>
+                <div>
+                    <span id="tituloExamenSeleccionadoTag" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold uppercase tracking-wider">Evaluación</span>
+                    <h2 id="tituloExamenSeleccionado" class="text-2xl font-extrabold text-slate-900 mt-2"></h2>
+                    <p id="descripcionExamenSeleccionado" class="text-sm text-slate-500 mt-1"></p>
+                </div>
+                <div class="space-y-4 pt-2">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nombre completo</label>
+                        <input type="text" id="nombreAlumno" placeholder="Ej. Ana Sofía Martínez" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Correo electrónico</label>
+                        <input type="email" id="correoAlumno" placeholder="correo@ejemplo.com" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm">
+                    </div>
+                </div>
+                <button onclick="iniciarExamen()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition shadow">Comenzar Evaluación</button>
+            </div>
+
+            <div id="seccionExamenEnCurso" class="hidden space-y-6">
+                <header class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex justify-between items-center sticky top-5 z-40 backdrop-blur-md bg-white/90">
+                    <div>
+                        <h3 id="tituloExamenActivo" class="font-bold text-slate-900 text-lg"></h3>
+                        <p class="text-xs text-slate-500" id="infoAlumnoActivo"></p>
+                    </div>
+                    <div class="bg-slate-900 text-white px-5 py-2.5 rounded-2xl shadow-inner text-center">
+                        <span class="block text-[10px] uppercase tracking-wider text-slate-400">Tiempo Restante</span>
+                        <span id="timer" class="text-lg font-mono font-bold text-amber-400">00:00</span>
+                    </div>
+                </header>
+                <form id="formExamen" class="space-y-6"></form>
+                <button type="button" onclick="finalizarExamen()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 rounded-2xl transition shadow-lg text-center">Finalizar y Enviar Evaluación</button>
+            </div>
+
+            <div id="seccionResultadoAlumno" class="hidden bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6 text-center max-w-xl mx-auto">
+                <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto shadow-inner">🎉</div>
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-bold text-slate-900">¡Evaluación Completada!</h2>
+                    <p id="mensajeCalificacion" class="text-lg font-medium text-slate-600 mt-2"></p>
+                </div>
+                <button onclick="location.reload()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow">Regresar al Inicio</button>
+            </div>
+        </div>
+
+        <!-- PANEL ADMINISTRADOR -->
+        <div id="vistaAdmin" class="hidden space-y-8">
+            <div class="grid sm:grid-cols-3 gap-4">
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-1">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Exámenes</span>
+                    <h3 id="statTotalExamenes" class="text-3xl font-extrabold text-slate-900">0</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-1">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Alumnos Evaluados</span>
+                    <h3 id="statTotalAlumnos" class="text-3xl font-extrabold text-blue-600">0</h3>
+                </div>
+                <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-1">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Promedio General</span>
+                    <h3 id="statPromedioGeneral" class="text-3xl font-extrabold text-emerald-600">0.0</h3>
+                </div>
+            </div>
+
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 space-y-8">
+                <div class="flex border-b border-slate-200 pb-4 space-x-4">
+                    <button onclick="cambiarTabAdmin('examenes')" id="tabBtnExamenes" class="font-bold text-sm px-4 py-2 rounded-xl bg-blue-600 text-white transition">Gestión de Exámenes</button>
+                    <button onclick="cambiarTabAdmin('banco')" id="tabBtnBanco" class="font-semibold text-sm px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition">Banco de Preguntas</button>
+                    <button onclick="cambiarTabAdmin('calificaciones')" id="tabBtnCalificaciones" class="font-semibold text-sm px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition">Resultados y Reportes</button>
+                </div>
+
+                <!-- Tab Exámenes -->
+                <div id="tabExamenes" class="space-y-6">
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <h3 class="font-bold text-slate-900 text-lg">➕ Crear Nuevo Examen (Guarda en GitHub)</h3>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Título del Examen</label>
+                                <input type="text" id="nuevoTituloExamen" placeholder="Ej. Certificación" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tiempo Límite (Minutos)</label>
+                                <input type="number" id="nuevoTiempoExamen" value="15" min="1" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Descripción breve</label>
+                            <textarea id="nuevoDescExamen" rows="2" placeholder="Instrucciones..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"></textarea>
+                        </div>
+                        <button onclick="crearExamen()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition shadow">Guardar Examen en GitHub</button>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-slate-900 text-lg">📋 Exámenes Creados</h3>
+                        <div id="listaExamenesAdmin" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- Tab Banco de Preguntas -->
+                <div id="tabBanco" class="hidden space-y-6">
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <h3 class="font-bold text-slate-900 text-lg">➕ Registrar Pregunta (Guarda en GitHub)</h3>
+                        <div class="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Asignar al Examen</label>
+                                <select id="adminSelectExamen" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm"></select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Tipo de Pregunta</label>
+                                <select id="adminTipo" onchange="cambiarTipoPreguntaAdmin()" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                                    <option value="opcion_multiple">Opción Múltiple</option>
+                                    <option value="falso_verdadero">Falso / Verdadero</option>
+                                    <option value="abierta">Pregunta Abierta</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Enunciado</label>
+                            <input type="text" id="adminPregunta" placeholder="Escribe la pregunta..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                        </div>
+                        <div id="contenedorOpciones" class="space-y-2">
+                            <label class="block text-sm font-medium text-slate-700">Opciones (Separadas por comas)</label>
+                            <input type="text" id="adminOpciones" placeholder="Opción A, Opción B, Opción C" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Respuesta Correcta</label>
+                            <input type="text" id="adminCorrecta" placeholder="Debe coincidir con una opción" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm">
+                        </div>
+                        <button onclick="guardarPreguntaBanco()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition shadow">Guardar Pregunta en GitHub</button>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="font-bold text-slate-900 text-lg">🗂️ Preguntas Registradas</h3>
+                        <div id="listaPreguntasBancoAdmin" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- Tab Calificaciones -->
+                <div id="tabCalificaciones" class="hidden space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-slate-900 text-lg">📊 Historial de Calificaciones</h3>
+                        <button onclick="descargarReporteMaestroCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow">📥 Descargar Reporte Maestro (CSV)</button>
+                    </div>
+                    <div id="listaCalificacionesAdmin" class="space-y-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
