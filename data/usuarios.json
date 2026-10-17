@@ -16,5 +16,14 @@
     "rol": "editor",
     "area": "Administracion",
     "tokenHash": ""
+  },
+  {
+    "id": 1792210821946,
+    "nombre": "juan",
+    "usuario": "juan",
+    "pass": "bm9sZXA=",
+    "rol": "visualizador",
+    "area": "Geomatica",
+    "tokenHash": ""
   }
 ]
