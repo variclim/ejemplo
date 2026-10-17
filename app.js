@@ -16,7 +16,7 @@ const catalogosDefault = {
 };
 
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'El mero Chiludon' }
+    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -116,6 +116,8 @@ function procesarLogin() {
 
         cerrarModalLogin();
         mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
+        
+        // CORRECCIÓN CLAVE: Forzar renderizado inmediato de la interfaz según el rol
         renderizarInterfazPorRol();
     } else {
         alert('Usuario o contraseña incorrectos.');
@@ -133,6 +135,8 @@ function cerrarSesion() {
 // ================= RENDERIZADO POR ROL =================
 function renderizarInterfazPorRol() {
     const navInfo = document.getElementById('navSessionInfo');
+    if (!navInfo) return;
+
     const rolColors = { admin: 'bg-purple-100 text-purple-800', editor: 'bg-blue-100 text-blue-800', visualizador: 'bg-emerald-100 text-emerald-800' };
     
     navInfo.innerHTML = `
@@ -144,6 +148,7 @@ function renderizarInterfazPorRol() {
     `;
 
     const container = document.getElementById('appContainer');
+    if (!container) return;
     
     if (sesionActual.rol === 'visualizador') {
         container.innerHTML = generarVistaVisualizador();
@@ -224,7 +229,7 @@ function generarVistaEditor() {
     `;
 }
 
-// ================= VISTA ADMINISTRADOR (CORREGIDA Y COMPLETA) =================
+// ================= VISTA ADMINISTRADOR =================
 function generarVistaAdmin() {
     let htmlTareasAdmin = dbTareas.map(t => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
@@ -250,15 +255,6 @@ function generarVistaAdmin() {
 
     let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
     let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
-
-    let htmlTareasAdminCreacion = dbTareas.map(t => `
-        <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
-            <div>
-                <span class="font-bold">${t.titulo}</span> <span class="text-xs text-slate-500">(${t.area} / ${t.proyecto}) — Estado: ${t.estado}</span>
-            </div>
-            <button onclick="eliminarTareaAdmin(${t.id})" class="bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-lg">Eliminar</button>
-        </div>
-    `).join('');
 
     return `
         <div class="space-y-8">
