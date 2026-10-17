@@ -1,1 +1,15 @@
-[]
+{
+  "areas": [
+    "Agricola",
+    "Geomatica",
+    "Meteorologia",
+    "Sistemas",
+    "Administracion",
+    "Coordinacion"
+  ],
+  "proyectos": [
+    "Monitoreo Satelital 2026",
+    "Atlas de Riesgo Municipal",
+    "Red Hidrológica Presa San José"
+  ]
+}
