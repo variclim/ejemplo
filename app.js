@@ -11,7 +11,7 @@ let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas',
 let dbTareas = [];
 let pestanaActiva = 'tareas'; 
 
-// Hash SHA-256 exacto para "admin123"
+// Hash SHA-256 oficial para "admin123"
 const usuarioAdminDefault = [
     { id: 1, usuario: 'admin', passHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
@@ -36,14 +36,14 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// ================= SHA-256 ESTÁNDAR (Puro y Síncrono) =================
+// ================= SHA-256 ROBUSTO Y DIRECTO =================
 function sha256(ascii) {
     function rightRotate(value, amount) {
         return (value >>> amount) | (value << (32 - amount));
     }
     var mathPow = Math.pow;
     var maxWord = mathPow(2, 32);
-    var lengthProperty = 'length'
+    var lengthProperty = 'length';
     var i, j;
     var result = '';
     var words = [];
@@ -95,7 +95,6 @@ function sha256(ascii) {
     return result;
 }
 
-// Cifrado simétrico para tokens de GitHub
 function encriptarPass(texto) {
     if (!texto) return '';
     try { return btoa(encodeURIComponent(texto).split('').reverse().join('')); } catch(e) { return texto; }
@@ -180,7 +179,7 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 }
 
-// ================= AUTENTICACIÓN DIRECTA CON SHA-256 =================
+// ================= AUTENTICACIÓN =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
@@ -194,8 +193,8 @@ function procesarLogin() {
     if (encontrado) {
         const hashIngresado = sha256(pass);
         
-        // Comprobación directa y síncrona del hash SHA-256 con soporte de respaldo a texto plano por si acaso
-        const esValida = (encontrado.passHash && encontrado.passHash === hashIngresado) || (encontrado.pass === pass);
+        // Valida contra passHash o respaldo opcional en texto plano
+        const esValida = (encontrado.passHash && encontrado.passHash === hashIngresado) || (encontrado.pass && encontrado.pass === pass);
 
         if (esValida) {
             sesionActual = encontrado;
@@ -228,7 +227,7 @@ function cerrarSesion() {
     location.reload();
 }
 
-// ================= RENDERIZADO POR PESTAÑAS Y ROLES =================
+// ================= RENDERIZADO Y ROLES =================
 function cambiarPestana(pestana) {
     pestanaActiva = pestana;
     renderizarInterfazPorRol();
@@ -277,7 +276,6 @@ function renderizarInterfazPorRol() {
     container.innerHTML = tabsHTML + contenidoTab;
 }
 
-// ================= VISTA 1: TAREAS =================
 function generarVistaTareas(tareas) {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
     let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
@@ -329,7 +327,6 @@ function generarVistaTareas(tareas) {
     return `<div class="space-y-6">${formularioNuevaTarea}<div class="space-y-3">${htmlTareas || '<p class="text-sm text-slate-400 text-center py-6">No hay tareas.</p>'}</div></div>`;
 }
 
-// ================= VISTA 2: GESTIÓN DE USUARIOS =================
 function generarVistaUsuarios() {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
     const adminActualObj = dbUsuarios.find(u => u.rol === 'admin');
@@ -378,7 +375,6 @@ function generarVistaUsuarios() {
     `;
 }
 
-// ================= VISTA 3: CALENDARIO GRÁFICO =================
 function generarVistaCalendario(tareas) {
     const tareasOrdenadas = [...tareas].sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
     let htmlTarjetas = tareasOrdenadas.map(t => `
@@ -394,7 +390,6 @@ function generarVistaCalendario(tareas) {
     return `<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">${htmlTarjetas || '<p class="text-sm text-slate-400 col-span-3 text-center py-12 bg-white rounded-3xl border">No hay actividades.</p>'}</div>`;
 }
 
-// ================= VISTA 4: INFORMES =================
 function generarVistaInformes(tareas) {
     let total = tareas.length;
     let concluidas = tareas.filter(t => t.estado === 'Concluida').length;
@@ -415,7 +410,6 @@ function generarVistaInformes(tareas) {
     `;
 }
 
-// ================= ACCIONES =================
 async function guardarTokenAdmin() {
     const rawToken = sanearTexto(document.getElementById('adminTokenInput').value.trim());
     if (!rawToken) return alert('Ingresa un token válido.');
