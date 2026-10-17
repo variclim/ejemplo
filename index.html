@@ -3,10 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Institucional con GitHub DB</title>
+    <title>Agenda Electrónica Institucional Avanzada</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            body * { visibility: hidden; }
+            #printableArea, #printableArea * { visibility: visible; }
+            #printableArea { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased min-h-screen py-8 px-4">
 
@@ -14,7 +22,7 @@
         <div id="toast" class="fixed top-5 right-5 z-50 hidden px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all"></div>
 
         <!-- Navbar -->
-        <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
             <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
                 <div>
@@ -78,6 +86,7 @@
         let dbUsuarios = [];
         let dbCatalogos = { areas: [], proyectos: [] };
         let dbTareas = [];
+        let filtroCalendarioActual = 'todos'; // 'todos', 'semana', 'mes'
 
         const catalogosDefault = {
             areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'],
@@ -115,7 +124,7 @@
                     return JSON.parse(decoded);
                 }
             } catch (e) {
-                console.log(`Error al leer ${ruta} de GitHub, usando local.`);
+                console.log(`Error al leer ${ruta} de GitHub.`);
             }
             return null;
         }
@@ -145,7 +154,6 @@
         }
 
         async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
-            // Respaldar localmente
             localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
 
             if (!tokenAdmin) {
@@ -187,6 +195,51 @@
                 mostrarToast('Error al actualizar en GitHub (Verifica tu Token PAT).', 'error');
                 return false;
             }
+        }
+
+        // ================= FILTROS DE CALENDARIO =================
+        function cambiarFiltroCalendario(filtro) {
+            filtroCalendarioActual = filtro;
+            renderizarInterfazPorRol();
+        }
+
+        function obtenerTareasFiltradas() {
+            const hoy = new Date();
+            return (dbTareas || []).filter(t => {
+                if (!t.fechaLimite) return true;
+                const fechaTarea = new Date(t.fechaLimite + 'T00:00:00');
+                if (filtroCalendarioActual === 'semana') {
+                    const primerDiaSemana = new Date(hoy.setDate(hoy.getDate() - hoy.getDay()));
+                    const ultimoDiaSemana = new Date(hoy.setDate(hoy.getDate() - hoy.getDay() + 6));
+                    return fechaTarea >= primerDiaSemana && fechaTarea <= ultimoDiaSemana;
+                } else if (filtroCalendarioActual === 'mes') {
+                    return fechaTarea.getMonth() === hoy.getMonth() && fechaTarea.getFullYear() === hoy.getFullYear();
+                }
+                return true;
+            });
+        }
+
+        // ================= SEMÁFOROS Y GRÁFICOS VISUALES =================
+        function obtenerSemaforoHTML(avance, estado) {
+            let color = "bg-rose-500";
+            let texto = "Crítico";
+            if (estado === 'Concluida' || avance >= 100) {
+                color = "bg-emerald-500";
+                texto = "Concluida";
+            } else if (avance >= 50) {
+                color = "bg-amber-500";
+                texto = "En Proceso";
+            } else if (avance > 0) {
+                color = "bg-blue-500";
+                texto = "Inicial";
+            }
+
+            return `
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full ${color} shadow-sm animate-pulse"></span>
+                    <span class="text-xs font-semibold text-slate-600">${avance}% (${texto})</span>
+                </div>
+            `;
         }
 
         // ================= AUTENTICACIÓN =================
@@ -235,7 +288,7 @@
                     <span class="block text-xs font-bold text-slate-800">${sesionActual.nombre}</span>
                     <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${rolColors[sesionActual.rol]}">${sesionActual.rol}</span>
                 </div>
-                <button onclick="cerrarSesion()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">Salir</button>
+                <button onclick="cerrarSesion()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition no-print">Salir</button>
             `;
 
             const container = document.getElementById('appContainer');
@@ -246,39 +299,68 @@
             else if (sesionActual.rol === 'admin') container.innerHTML = generarVistaAdmin();
         }
 
-        function generarVistaVisualizador() {
-            let htmlTareas = (dbTareas || []).map(t => `
-                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
-                    <div>
-                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
-                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-blue-50 text-blue-600">${t.proyecto}</span>
-                        <h4 class="font-bold text-slate-900 mt-1">${t.titulo}</h4>
-                        <p class="text-xs text-slate-500">Límite: ${t.fechaLimite} — Responsable: ${t.responsable}</p>
+        // ================= VISTAS CON CALENDARIO Y SEMÁFOROS =================
+        function generarMenuCalendarioFiltros() {
+            return `
+                <div class="flex gap-2 bg-white p-3 rounded-2xl border shadow-sm items-center justify-between no-print">
+                    <span class="text-xs font-bold text-slate-500 uppercase ml-2">Filtrar Calendario:</span>
+                    <div class="flex gap-2">
+                        <button onclick="cambiarFiltroCalendario('todos')" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${filtroCalendarioActual === 'todos' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}">Todas</button>
+                        <button onclick="cambiarFiltroCalendario('semana')" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${filtroCalendarioActual === 'semana' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}">Esta Semana</button>
+                        <button onclick="cambiarFiltroCalendario('mes')" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${filtroCalendarioActual === 'mes' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'}">Este Mes</button>
                     </div>
-                    <div class="text-right">
-                        <span class="text-xs font-bold">Avance: ${t.avance}%</span>
-                        <span class="block px-3 py-1 text-xs font-semibold rounded-xl mt-1 ${t.estado === 'Concluida' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${t.estado}</span>
+                </div>
+            `;
+        }
+
+        function generarVistaVisualizador() {
+            const tareasVisibles = obtenerTareasFiltradas();
+            let htmlTareas = tareasVisibles.map(t => `
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">${t.area}</span>
+                        <span class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 ml-1">${t.proyecto}</span>
+                        <h4 class="font-bold text-slate-900 text-base mt-2">${t.titulo}</h4>
+                        <p class="text-xs text-slate-500 mt-0.5">Límite: ${t.fechaLimite} — Responsable: ${t.responsable}</p>
+                    </div>
+                    <div class="flex items-center gap-6 w-full sm:w-auto justify-between">
+                        ${obtenerSemaforoHTML(t.avance, t.estado)}
+                        <span class="px-3 py-1 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${t.estado}</span>
                     </div>
                 </div>
             `).join('');
 
-            return `<div class="space-y-6"><div class="bg-white p-6 rounded-3xl border shadow-sm"><h2 class="text-xl font-extrabold">Panel de Visualización</h2></div><div class="space-y-3">${htmlTareas || '<p>No hay tareas.</p>'}</div></div>`;
+            return `
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-3xl border shadow-sm">
+                        <h2 class="text-xl font-extrabold text-slate-900">Panel de Visualización</h2>
+                        <p class="text-sm text-slate-500">Consulta las actividades a realizar con semáforos de avance y metas.</p>
+                    </div>
+                    ${generarMenuCalendarioFiltros()}
+                    <div class="space-y-3">${htmlTareas || '<p class="text-sm text-slate-400">No hay tareas para este filtro.</p>'}</div>
+                </div>
+            `;
         }
 
         function generarVistaEditor() {
             let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
             let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
 
-            let htmlTareas = (dbTareas || []).map(t => `
-                <div class="p-5 bg-white rounded-2xl border shadow-sm flex justify-between items-center">
+            const tareasVisibles = obtenerTareasFiltradas();
+            let htmlTareas = tareasVisibles.map(t => `
+                <div class="p-5 bg-white rounded-2xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
-                        <h4 class="font-bold text-slate-900 mt-1">${t.titulo}</h4>
-                        <p class="text-xs text-slate-500">Límite: ${t.fechaLimite}</p>
+                        <span class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600">${t.area}</span>
+                        <span class="text-[10px] font-bold uppercase px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 ml-1">${t.proyecto}</span>
+                        <h4 class="font-bold text-slate-900 text-base mt-2">${t.titulo}</h4>
+                        <p class="text-xs text-slate-500">Límite: ${t.fechaLimite} — Responsable: ${t.responsable}</p>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1 border rounded text-xs text-center">
-                        <button onclick="toggleConcluir(${t.id})" class="px-3 py-1 text-xs font-semibold rounded ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}">${t.estado}</button>
+                    <div class="flex items-center gap-4">
+                        ${obtenerSemaforoHTML(t.avance, t.estado)}
+                        <div class="flex items-center gap-2">
+                            <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1.5 border rounded-xl text-xs text-center font-bold">
+                            <button onclick="toggleConcluir(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">${t.estado}</button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -286,15 +368,16 @@
             return `
                 <div class="space-y-6">
                     <div class="bg-white p-6 rounded-3xl border shadow-sm space-y-4">
-                        <h2 class="text-xl font-extrabold">Panel de Editor — Agregar Tareas</h2>
+                        <h2 class="text-xl font-extrabold text-slate-900">Panel de Editor — Control de Avances y Metas</h2>
                         <div class="grid sm:grid-cols-4 gap-3">
                             <input type="text" id="edTitulo" placeholder="Título" class="px-4 py-2 border rounded-xl text-sm">
                             <select id="edArea" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsAreas}</select>
                             <select id="edProyecto" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsProyectos}</select>
                             <input type="date" id="edFecha" class="px-4 py-2 border rounded-xl text-sm">
                         </div>
-                        <button onclick="editorAgregarTarea()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Guardar Tarea</button>
+                        <button onclick="editorAgregarTarea()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm shadow">Guardar Tarea</button>
                     </div>
+                    ${generarMenuCalendarioFiltros()}
                     <div class="space-y-3">${htmlTareas}</div>
                 </div>
             `;
@@ -311,22 +394,34 @@
                 </div>
             `).join('');
 
-            let htmlTareas = (dbTareas || []).map(t => `
-                <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
-                    <span><b>${t.titulo}</b> (${t.area} / ${t.proyecto})</span>
-                    <button onclick="adminEliminarTarea(${t.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded text-xs font-semibold">Eliminar</button>
+            const tareasVisibles = obtenerTareasFiltradas();
+            let htmlTareas = tareasVisibles.map(t => `
+                <div class="p-4 bg-white rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
+                    <div>
+                        <span class="font-bold">${t.titulo}</span> <span class="text-xs text-slate-500">(${t.area} / ${t.proyecto})</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        ${obtenerSemaforoHTML(t.avance, t.estado)}
+                        <div class="flex items-center gap-2">
+                            <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1 border rounded text-xs text-center font-bold">
+                            <button onclick="adminEliminarTarea(${t.id})" class="bg-rose-50 text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold">Eliminar</button>
+                        </div>
+                    </div>
                 </div>
             `).join('');
 
             return `
-                <div class="space-y-8">
-                    <div class="grid sm:grid-cols-3 gap-4">
+                <div class="space-y-8" id="printableArea">
+                    <div class="grid sm:grid-cols-4 gap-4 no-print">
                         <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Total Tareas</span><h3 class="text-3xl font-extrabold mt-1">${(dbTareas || []).length}</h3></div>
                         <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Concluidas</span><h3 class="text-3xl font-extrabold text-emerald-600 mt-1">${(dbTareas || []).filter(t => t.estado === 'Concluida').length}</h3></div>
-                        <div class="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between"><span class="text-xs font-bold text-slate-400 uppercase">Informes</span><button onclick="exportarCSV()" class="bg-emerald-600 text-white font-semibold text-xs py-2 px-4 rounded-xl">📥 Exportar CSV</button></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between"><span class="text-xs font-bold text-slate-400 uppercase">Informes CSV</span><button onclick="exportarCSV()" class="bg-emerald-600 text-white font-semibold text-xs py-2 px-4 rounded-xl shadow">📥 Exportar CSV</button></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between"><span class="text-xs font-bold text-slate-400 uppercase">Imprimir Informe</span><button onclick="window.print()" class="bg-slate-900 text-white font-semibold text-xs py-2 px-4 rounded-xl shadow">🖨️ Imprimir Reporte</button></div>
                     </div>
 
-                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                    ${generarMenuCalendarioFiltros()}
+
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4 no-print">
                         <h3 class="font-extrabold text-lg">➕ Crear Usuario</h3>
                         <div class="grid sm:grid-cols-4 gap-3">
                             <input type="text" id="nuevoNombre" placeholder="Nombre" class="px-4 py-2 border rounded-xl text-sm">
@@ -337,7 +432,7 @@
                         <button onclick="adminCrearUsuario()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Crear</button>
                     </div>
 
-                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4 no-print">
                         <h3 class="font-extrabold text-lg">📁 Catálogos</h3>
                         <div class="grid sm:grid-cols-2 gap-6">
                             <div><input type="text" id="catArea" placeholder="Nueva Área" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarArea()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Área</button><p class="text-xs text-slate-500 mt-2">${(dbCatalogos?.areas || []).join(', ')}</p></div>
@@ -345,7 +440,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4 no-print">
                         <h3 class="font-extrabold text-lg">📝 Registrar Tarea</h3>
                         <div class="grid sm:grid-cols-4 gap-3">
                             <input type="text" id="admTitulo" placeholder="Título" class="px-4 py-2 border rounded-xl text-sm">
@@ -356,13 +451,13 @@
                         <button onclick="adminCrearTarea()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Guardar</button>
                     </div>
 
-                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">👥 Usuarios</h3><div class="space-y-2">${htmlUsuarios}</div></div>
-                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">📋 Tareas</h3><div class="space-y-2">${htmlTareas}</div></div>
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4 no-print"><h3 class="font-extrabold text-lg">👥 Usuarios</h3><div class="space-y-2">${htmlUsuarios}</div></div>
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">📋 Control Total de Tareas e Informes</h3><div class="space-y-2">${htmlTareas}</div></div>
                 </div>
             `;
         }
 
-        // Acciones con sincronización en GitHub
+        // ================= ACCIONES =================
         async function adminCrearUsuario() {
             const nombre = document.getElementById('nuevoNombre').value.trim();
             const usuario = document.getElementById('nuevoUser').value.trim();
