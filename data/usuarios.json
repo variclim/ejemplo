@@ -5,14 +5,7 @@
     "pass": "admin123",
     "rol": "admin",
     "nombre": "Administrador General",
-    "area": "Coordinacion"
-  },
-  {
-    "id": 1792208834966,
-    "nombre": "Mona1",
-    "usuario": "mona",
-    "pass": "NTQzMjE=",
-    "rol": "editor",
-    "area": "Administracion"
+    "area": "Coordinacion",
+    "tokenHash": ""
   }
 ]
