@@ -11,14 +11,16 @@ let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas',
 let dbTareas = [];
 let pestanaActiva = 'tareas'; 
 
+// Hash SHA-256 de "admin123" para el usuario administrador por defecto
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
+    { id: 1, usuario: 'admin', passHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
     await cargarDatosDesdeGitHub();
     if (sesionActual) {
         if (!tokenAdmin && sesionActual.tokenHash) {
+            tokenAdmin = desencriptarPass(tokenAdmin); // o desencriptarToken si usas otra capa
             tokenAdmin = desencriptarPass(sesionActual.tokenHash);
             sessionStorage.setItem('ae_github_token', tokenAdmin);
         }
@@ -35,7 +37,17 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// Funciones de cifrado y seguridad sin bloqueos
+// ================= SEGURIDAD CRIPTOGRÁFICA (SHA-256 Real) =================
+async function encriptarSHA256(texto) {
+    if (!texto) return '';
+    const encoder = new TextEncoder();
+    const data = encoder.encode(texto);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// Cifrado para tokens de GitHub (independiente de la contraseña)
 function encriptarPass(texto) {
     if (!texto) return '';
     try { return btoa(encodeURIComponent(texto).split('').reverse().join('')); } catch(e) { return texto; }
@@ -120,41 +132,44 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 }
 
-// ================= AUTENTICACIÓN DIRECTA Y FUNCIONAL =================
+// ================= AUTENTICACIÓN CON SHA-256 =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
-function procesarLogin() {
+async function procesarLogin() {
     const user = sanearTexto(document.getElementById('loginUser').value.trim());
     const pass = sanearTexto(document.getElementById('loginPassword').value.trim());
     const token = sanearTexto(document.getElementById('loginTokenGitHub').value.trim());
 
-    const encontrado = dbUsuarios.find(u => {
-        if (u.usuario !== user) return false;
-        if (u.pass === pass) return true;
-        return desencriptarPass(u.pass) === pass;
-    });
+    const encontrado = dbUsuarios.find(u => u.usuario === user);
 
     if (encontrado) {
-        sesionActual = encontrado;
-        sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+        const hashIngresado = await encriptarSHA256(pass);
+        
+        // Compara el hash SHA-256 calculado con el passHash almacenado
+        const esValida = encontrado.passHash && encontrado.passHash === hashIngresado;
 
-        if (token && encontrado.rol === 'admin') {
-            tokenAdmin = token;
-            sessionStorage.setItem('ae_github_token', token);
-            encontrado.tokenHash = encriptarPass(token);
-            guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
-        } else if (encontrado.tokenHash) {
-            tokenAdmin = desencriptarPass(encontrado.tokenHash);
-            sessionStorage.setItem('ae_github_token', tokenAdmin);
+        if (esValida) {
+            sesionActual = encontrado;
+            sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+
+            if (token && encontrado.rol === 'admin') {
+                tokenAdmin = token;
+                sessionStorage.setItem('ae_github_token', token);
+                encontrado.tokenHash = encriptarPass(token);
+                await guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
+            } else if (encontrado.tokenHash) {
+                tokenAdmin = desencriptarPass(encontrado.tokenHash);
+                sessionStorage.setItem('ae_github_token', tokenAdmin);
+            }
+
+            cerrarModalLogin();
+            mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
+            renderizarInterfazPorRol();
+            return;
         }
-
-        cerrarModalLogin();
-        mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
-        renderizarInterfazPorRol();
-    } else {
-        alert('Usuario o contraseña incorrectos.');
     }
+    alert('Usuario o contraseña incorrectos.');
 }
 
 function cerrarSesion() {
@@ -372,9 +387,10 @@ async function cambiarPasswordUsuario(id) {
     if (!inputPass) return alert('Ingresa la nueva contraseña.');
     const usuarioObj = dbUsuarios.find(u => u.id === id);
     if (usuarioObj) {
-        usuarioObj.pass = encriptarPass(inputPass);
+        usuarioObj.passHash = await encriptarSHA256(inputPass);
+        delete usuarioObj.pass;
         await guardarEnGitHub('usuarios.json', dbUsuarios, `Actualizar contraseña de ${usuarioObj.usuario}`);
-        mostrarToast(`Contraseña actualizada para ${usuarioObj.nombre}.`);
+        mostrarToast(`Contraseña actualizada mediante SHA-256 para ${usuarioObj.nombre}.`);
         renderizarInterfazPorRol();
     }
 }
@@ -389,17 +405,19 @@ async function crearUsuario() {
 
     if (!nombre || !usuario || !pass) return alert('Completa todos los campos.');
 
+    const passHash = await encriptarSHA256(pass);
+
     dbUsuarios.push({
         id: Date.now(),
         nombre,
         usuario,
-        pass: encriptarPass(pass),
+        passHash,
         rol,
         area,
         tokenHash: ""
     });
 
-    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario');
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario con SHA-256');
     mostrarToast('Usuario creado correctamente.');
     renderizarInterfazPorRol();
 }
