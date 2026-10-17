@@ -24,8 +24,8 @@
     "titulo": "ggggg",
     "area": "Administracion",
     "proyecto": "Patria",
-    "estado": "Pendiente",
-    "avance": 0,
+    "estado": "Concluida",
+    "avance": 100,
     "fechaLimite": "2026-10-06",
     "responsable": "uno"
   }
