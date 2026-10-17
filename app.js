@@ -35,18 +35,14 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// Cifrado y descifrado seguro blindado contra textos planos
 function encriptarPass(texto) {
     if (!texto) return '';
-    try {
-        return btoa(encodeURIComponent(texto).split('').reverse().join(''));
-    } catch(e) { return texto; }
+    try { return btoa(encodeURIComponent(texto).split('').reverse().join('')); } catch(e) { return texto; }
 }
 
 function desencriptarPass(hash) {
     if (!hash) return '';
     try { 
-        // Si no es un hash válido en base64, devolvemos el texto original para evitar bloqueos
         if (!/^[A-Za-z0-9+/=]+$/.test(hash)) return hash;
         return decodeURIComponent(atob(hash).split('').reverse().join('')); 
     } catch(e) { return hash; }
@@ -93,7 +89,7 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 
     if (!tokenAdmin) {
-        mostrarToast('Acción detenida: El Administrador debe configurar su Token de GitHub en la pestaña de Usuarios.', 'error');
+        mostrarToast('Acción detenida: Se requiere configurar el Token de GitHub al iniciar sesión.', 'error');
         return false;
     }
 
@@ -120,15 +116,15 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 }
 
-// ================= AUTENTICACIÓN LIBRE DE BLOQUEOS =================
+// ================= AUTENTICACIÓN =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
-function procesarLogin() {
+async function procesarLogin() {
     const user = document.getElementById('loginUser').value.trim();
     const pass = document.getElementById('loginPassword').value.trim();
+    const token = document.getElementById('loginTokenGitHub').value.trim();
 
-    // Verificación robusta: compara texto plano o contraseña desencriptada
     const encontrado = dbUsuarios.find(u => {
         if (u.usuario !== user) return false;
         if (u.pass === pass) return true;
@@ -139,7 +135,13 @@ function procesarLogin() {
         sesionActual = encontrado;
         sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
 
-        if (encontrado.tokenHash) {
+        if (token && encontrado.rol === 'admin') {
+            tokenAdmin = token;
+            sessionStorage.setItem('ae_github_token', token);
+            // Guardar el token encriptado en el perfil del admin automáticamente
+            encontrado.tokenHash = encriptarPass(token);
+            await guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
+        } else if (encontrado.tokenHash) {
             tokenAdmin = desencriptarPass(encontrado.tokenHash);
             sessionStorage.setItem('ae_github_token', tokenAdmin);
         }
@@ -195,7 +197,7 @@ function renderizarInterfazPorRol() {
     `;
 
     if (sesionActual.rol === 'admin') {
-        tabsHTML += `<button onclick="cambiarPestana('usuarios')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'usuarios' ? 'bg-purple-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">👥 Gestión de Usuarios y Token</button>`;
+        tabsHTML += `<button onclick="cambiarPestana('usuarios')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'usuarios' ? 'bg-purple-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">👥 Gestión de Usuarios</button>`;
     }
     tabsHTML += `</div>`;
 
@@ -268,11 +270,9 @@ function generarVistaTareas(tareas) {
     `;
 }
 
-// ================= VISTA 2: GESTIÓN DE USUARIOS Y TOKEN (ADMIN) =================
+// ================= VISTA 2: GESTIÓN DE USUARIOS =================
 function generarVistaUsuarios() {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
-    const adminActualObj = dbUsuarios.find(u => u.rol === 'admin');
-    const tokenConfigurado = adminActualObj && adminActualObj.tokenHash ? "🔒 Token de GitHub Configurado y Encriptado" : "⚠️ Sin Token Configurado";
 
     let htmlUsuarios = dbUsuarios.map(u => `
         <div class="p-4 bg-white rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
@@ -289,21 +289,8 @@ function generarVistaUsuarios() {
 
     return `
         <div class="space-y-8">
-            <!-- Módulo donde el Admin configura su Token de GitHub -->
-            <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
-                <div class="flex justify-between items-center">
-                    <h3 class="font-extrabold text-lg text-slate-900">🔑 Token de GitHub del Administrador</h3>
-                    <span class="text-xs font-bold px-3 py-1 rounded-full ${adminActualObj?.tokenHash ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${tokenConfigurado}</span>
-                </div>
-                <p class="text-xs text-slate-500">Ingresa tu Token (PAT) de GitHub. El sistema lo encriptará y guardará de forma segura para permitir la sincronización en la nube.</p>
-                <div class="flex gap-3">
-                    <input type="password" id="adminTokenInput" placeholder="ghp_..." class="w-full px-4 py-2.5 border rounded-xl text-sm">
-                    <button onclick="guardarTokenAdmin()" class="bg-slate-900 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow whitespace-nowrap">Encriptar y Guardar Token</button>
-                </div>
-            </div>
-
             <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
-                <h3 class="font-extrabold text-lg">➕ Registrar Nuevo Usuario (Editor o Visualizador)</h3>
+                <h3 class="font-extrabold text-lg">➕ Registrar Nuevo Usuario</h3>
                 <div class="grid sm:grid-cols-4 gap-3">
                     <input type="text" id="uNombre" placeholder="Nombre completo" class="px-4 py-2.5 border rounded-xl text-sm">
                     <input type="text" id="uLogin" placeholder="Usuario (login)" class="px-4 py-2.5 border rounded-xl text-sm">
@@ -425,21 +412,6 @@ function generarVistaInformes(tareas) {
 }
 
 // ================= ACCIONES =================
-async function guardarTokenAdmin() {
-    const rawToken = document.getElementById('adminTokenInput').value.trim();
-    if (!rawToken) return alert('Ingresa un token válido.');
-
-    const adminObj = dbUsuarios.find(u => u.rol === 'admin');
-    if (adminObj) {
-        adminObj.tokenHash = encriptarPass(rawToken);
-        tokenAdmin = rawToken;
-        sessionStorage.setItem('ae_github_token', tokenAdmin);
-        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar token encriptado de administrador');
-        mostrarToast('¡Token de GitHub encriptado y guardado con éxito!');
-        renderizarInterfazPorRol();
-    }
-}
-
 async function cambiarPasswordUsuario(id) {
     const inputPass = document.getElementById(`newPass_${id}`).value.trim();
     if (!inputPass) return alert('Ingresa la nueva contraseña.');
