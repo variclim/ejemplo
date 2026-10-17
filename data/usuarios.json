@@ -3,7 +3,7 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "pass": "YWRtaW4xMjM=",
+    "pass": "admin123",
     "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": ""
