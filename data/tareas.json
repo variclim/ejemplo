@@ -28,5 +28,15 @@
     "avance": 90,
     "fechaLimite": "2026-10-06",
     "responsable": "uno"
+  },
+  {
+    "id": 1792280899551,
+    "titulo": "agricola",
+    "area": "Agricola",
+    "proyecto": "Patria",
+    "estado": "Pendiente",
+    "avance": 0,
+    "fechaLimite": "2026-10-24",
+    "responsable": "Administrador General"
   }
 ]
