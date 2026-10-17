@@ -7,5 +7,14 @@
     "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": "NldVUjA0M1dwcVVZbXRaNW52MTlvVnNHRkpKaE9WT2lSdjFiX3BoZw=="
+  },
+  {
+    "id": 1792210613881,
+    "nombre": "uno",
+    "usuario": "uno",
+    "pass": "Nzg5MA==",
+    "rol": "editor",
+    "area": "Administracion",
+    "tokenHash": ""
   }
 ]
