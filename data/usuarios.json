@@ -27,5 +27,16 @@
     "rol": "editor",
     "area": "Administracion",
     "tokenHash": ""
+  },
+  {
+    "id": 1792280309569,
+    "nombre": "dos",
+    "usuario": "dos",
+    "passHash": "dca1cff2c5c070fbc7a4a042467cf38e:070136c8650277258c292afa005103cb4009669d490bf73b148f0ca5d09d93b2",
+    "rol": "visualizador",
+    "area": "Agricola",
+    "verTodasAreas": false,
+    "asignarCualquierArea": false,
+    "tokenHash": ""
   }
 ]
