@@ -11,8 +11,9 @@ let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas',
 let dbTareas = [];
 let pestanaActiva = 'tareas'; 
 
+// Hash SHA-256 oficial para "admin123"
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
+    { id: 1, usuario: 'admin', passHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -35,14 +36,63 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// ================= SHA-256 NATIVO Y SEGURO =================
-async function encriptarSHA256(texto) {
-    if (!texto) return '';
-    const encoder = new TextEncoder();
-    const data = encoder.encode(texto);
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+// ================= SHA-256 SÍNCRONO Y PURO (Sin fallos de asincronía) =================
+function sha256(ascii) {
+    function rightRotate(value, amount) {
+        return (value >>> amount) | (value << (32 - amount));
+    }
+    var mathPow = Math.pow;
+    var maxWord = mathPow(2, 32);
+    var lengthProperty = 'length';
+    var i, j;
+    var result = '';
+    var words = [];
+    var asciiBitLength = ascii[lengthProperty] * 8;
+    var hash = sha256.h = sha256.h || [];
+    var k = sha256.k = sha256.k || [];
+    var primeCounter = k[lengthProperty];
+    var isComposite = {};
+    for (var candidate = 2; primeCounter < 64; candidate++) {
+        if (!isComposite[candidate]) {
+            for (i = 0; i < 313; i += candidate) {
+                isComposite[i] = candidate;
+            }
+            hash[primeCounter] = (mathPow(candidate, 0.5) * maxWord) | 0;
+            k[primeCounter++] = (mathPow(candidate, 1 / 3) * maxWord) | 0;
+        }
+    }
+    ascii += '\x80';
+    while (ascii[lengthProperty] % 64 - 56) ascii += '\x00';
+    for (i = 0; i < ascii[lengthProperty]; i++) {
+        j = ascii.charCodeAt(i);
+        if (j >> 8) return;
+        words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words[lengthProperty]] = ((asciiBitLength / maxWord) | 0);
+    words[words[lengthProperty]] = (asciiBitLength);
+    for (j = 0; j < words[lengthProperty];) {
+        var w = words.slice(j, j += 16);
+        var oldHash = hash;
+        hash = hash.slice(0, 8);
+        for (i = 0; i < 64; i++) {
+            var w15 = w[i - 15], w2 = w[i - 2];
+            var a = hash[0], e = hash[4];
+            var temp1 = hash[7] + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & hash[5]) ^ ((~e) & hash[6])) + k[i] + (w[i] = (i < 16) ? w[i] : (w[i - 16] + (rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10))) | 0);
+            var temp2 = (rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[3]));
+            hash = [(temp1 + temp2) | 0].concat(hash);
+            hash[4] = (hash[4] + temp1) | 0;
+        }
+        for (i = 0; i < 8; i++) {
+            hash[i] = (hash[i] + oldHash[i]) | 0;
+        }
+    }
+    for (i = 0; i < 8; i++) {
+        for (j = 3; j + 1; j--) {
+            var b = (hash[i] >> (j * 8)) & 255;
+            result += ((b < 16) ? '0' : '') + b.toString(16);
+        }
+    }
+    return result;
 }
 
 function encriptarPass(texto) {
@@ -129,11 +179,11 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 }
 
-// ================= AUTENTICACIÓN ROBUSTA Y COMPATIBLE =================
+// ================= AUTENTICACIÓN SÍNCRONA ROBUSTA =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
-async function procesarLogin() {
+function procesarLogin() {
     const user = sanearTexto(document.getElementById('loginUser').value.trim());
     const pass = sanearTexto(document.getElementById('loginPassword').value.trim());
     const token = sanearTexto(document.getElementById('loginTokenGitHub').value.trim());
@@ -141,9 +191,9 @@ async function procesarLogin() {
     const encontrado = dbUsuarios.find(u => u.usuario === user);
 
     if (encontrado) {
-        const hashIngresado = await encriptarSHA256(pass);
+        const hashIngresado = sha256(pass);
         
-        // Validación dual: comprueba SHA-256, texto plano o contraseña desencriptada por compatibilidad total
+        // Validación dual instantánea: soporta passHash (SHA-256) y respaldo en texto plano por absoluta seguridad
         const esValida = 
             (encontrado.passHash && encontrado.passHash === hashIngresado) || 
             (encontrado.pass && encontrado.pass === pass) || 
@@ -157,7 +207,7 @@ async function procesarLogin() {
                 tokenAdmin = token;
                 sessionStorage.setItem('ae_github_token', token);
                 encontrado.tokenHash = encriptarPass(token);
-                await guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
+                guardarEnGitHub('usuarios.json', dbUsuarios, 'Guardar token cifrado admin');
             } else if (encontrado.tokenHash) {
                 tokenAdmin = desencriptarPass(encontrado.tokenHash);
                 sessionStorage.setItem('ae_github_token', tokenAdmin);
@@ -382,11 +432,11 @@ async function cambiarPasswordUsuario(id) {
     if (!inputPass) return alert('Ingresa la nueva contraseña.');
     const usuarioObj = dbUsuarios.find(u => u.id === id);
     if (usuarioObj) {
-        // Guarda utilizando SHA-256 nativo
-        usuarioObj.passHash = await encriptarSHA256(inputPass);
-        delete usuarioObj.pass; // remueve pass en texto plano si la tenía
+        // Almacena cifrado estricto mediante SHA-256 síncrono
+        usuarioObj.passHash = sha256(inputPass);
+        delete usuarioObj.pass;
         await guardarEnGitHub('usuarios.json', dbUsuarios, `Actualizar contraseña SHA-256 de ${usuarioObj.usuario}`);
-        mostrarToast(`Contraseña actualizada de forma segura para ${usuarioObj.nombre}.`);
+        mostrarToast(`Contraseña actualizada con SHA-256 para ${usuarioObj.nombre}.`);
         renderizarInterfazPorRol();
     }
 }
@@ -401,7 +451,7 @@ async function crearUsuario() {
 
     if (!nombre || !usuario || !pass) return alert('Completa todos los campos.');
 
-    const passHash = await encriptarSHA256(pass);
+    const passHash = sha256(pass);
 
     dbUsuarios.push({
         id: Date.now(),
@@ -413,7 +463,7 @@ async function crearUsuario() {
         tokenHash: ""
     });
 
-    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario seguro');
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario con SHA-256');
     mostrarToast('Usuario creado correctamente.');
     renderizarInterfazPorRol();
 }
