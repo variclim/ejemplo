@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "id": 1,
+    "usuario": "admin",
+    "pass": "admin123",
+    "rol": "admin",
+    "nombre": "Administrador General"
+  }
+]
