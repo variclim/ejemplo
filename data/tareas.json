@@ -8,5 +8,15 @@
     "avance": 40,
     "fechaLimite": "2026-05-15",
     "responsable": "Sistema"
+  },
+  {
+    "id": 1792208145710,
+    "titulo": "Representcion Climatica Patria",
+    "area": "Geomatica",
+    "proyecto": "Patria",
+    "estado": "Pendiente",
+    "avance": 0,
+    "fechaLimite": "2026-10-16",
+    "responsable": "Administrador"
   }
 ]
