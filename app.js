@@ -14,8 +14,8 @@ let dbCatalogos = {
 let dbTareas = [];
 
 // Estado de UI
-let tabPrincipal = 'tareas';   // 'tareas' | 'calendario' | 'catalogos' | 'usuarios'
-let filtroTareas = 'todas';    // 'todas' | 'pendientes' | 'concluidas'
+let tabPrincipal = 'tareas';
+let filtroTareas = 'todas';
 let mesCalendario = new Date();
 
 const catalogosDefault = {
@@ -61,7 +61,6 @@ async function verificarPassword(p, almacenado) {
 window.addEventListener('DOMContentLoaded', async () => {
     await cargarDatosDesdeGitHub();
     if (sesionActual) renderizarInterfazPorRol();
-    actualizarIndicadorToken();
 });
 
 function mostrarToast(m, tipo = 'success') {
@@ -75,6 +74,7 @@ function mostrarToast(m, tipo = 'success') {
 
 // ================= TOKEN GITHUB UI =================
 function abrirModalToken() {
+    if (sesionActual?.rol !== 'admin') { mostrarToast('Solo el administrador puede editar el token.', 'error'); return; }
     document.getElementById('tokenInput').value = tokenAdmin || '';
     actualizarEstadoTokenModal();
     document.getElementById('modalToken').classList.remove('hidden');
@@ -93,31 +93,20 @@ function actualizarEstadoTokenModal() {
         el.className = 'text-xs font-semibold text-amber-600';
     }
 }
-function actualizarIndicadorToken() {
-    const btn = document.getElementById('btnToken');
-    if (!btn) return;
-    if (tokenAdmin) {
-        btn.textContent = '✅ Token';
-        btn.className = 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-2 rounded-xl transition';
-    } else {
-        btn.textContent = '⚙️ Token';
-        btn.className = 'bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-semibold px-3 py-2 rounded-xl transition';
-    }
-}
 function guardarToken() {
     const v = document.getElementById('tokenInput').value.trim();
     if (!v) { mostrarToast('Token vacío.', 'error'); return; }
     tokenAdmin = v;
     sessionStorage.setItem('ae_github_token', v);
     cerrarModalToken();
-    actualizarIndicadorToken();
+    renderizarInterfazPorRol();
     mostrarToast('Token guardado en esta sesión.');
 }
 function borrarToken() {
     tokenAdmin = '';
     sessionStorage.removeItem('ae_github_token');
     cerrarModalToken();
-    actualizarIndicadorToken();
+    renderizarInterfazPorRol();
     mostrarToast('Token eliminado.');
 }
 
@@ -220,15 +209,20 @@ function renderizarInterfazPorRol() {
         editor: 'bg-blue-100 text-blue-800',
         visualizador: 'bg-emerald-100 text-emerald-800'
     };
+
+    // Token: admin edita, editor/visualizador solo ven estado
+    const bloqueToken = sesionActual.rol === 'admin'
+        ? `<button onclick="abrirModalToken()" class="text-xs font-semibold px-3 py-2 rounded-xl transition ${tokenAdmin ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' : 'bg-amber-100 hover:bg-amber-200 text-amber-700'}">${tokenAdmin ? '✅ Token' : '⚙️ Token'}</button>`
+        : `<span class="text-xs font-semibold px-3 py-2 rounded-xl ${tokenAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${tokenAdmin ? '🟢 Conectado' : '🔴 Desconectado'}</span>`;
+
     nav.innerHTML = `
-        <button id="btnToken" onclick="abrirModalToken()" class="text-xs font-semibold px-3 py-2 rounded-xl transition">⚙️ Token</button>
+        ${bloqueToken}
         <div class="text-right">
             <span class="block text-xs font-bold text-slate-800">${sesionActual.nombre}</span>
             <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${colores[sesionActual.rol] || 'bg-slate-100'}">${sesionActual.rol} · ${sesionActual.area || 'Sin área'}</span>
         </div>
         <button onclick="cerrarSesion()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">Salir</button>
     `;
-    actualizarIndicadorToken();
 
     const c = document.getElementById('appContainer');
     const tabs = pestañasDisponibles();
@@ -265,20 +259,9 @@ function pestañasDisponibles() {
     ];
 }
 
-function cambiarTabPrincipal(t) {
-    tabPrincipal = t;
-    renderizarInterfazPorRol();
-}
-
-function cambiarFiltroTareas(f) {
-    filtroTareas = f;
-    renderizarInterfazPorRol();
-}
-
-function cambiarMes(delta) {
-    mesCalendario.setMonth(mesCalendario.getMonth() + delta);
-    renderizarInterfazPorRol();
-}
+function cambiarTabPrincipal(t) { tabPrincipal = t; renderizarInterfazPorRol(); }
+function cambiarFiltroTareas(f) { filtroTareas = f; renderizarInterfazPorRol(); }
+function cambiarMes(delta) { mesCalendario.setMonth(mesCalendario.getMonth() + delta); renderizarInterfazPorRol(); }
 
 // ================= PANEL: TAREAS =================
 function generarPanelTareas() {
@@ -351,13 +334,19 @@ function generarPanelTareas() {
     }
 
     const headerInfo = `
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-            <h2 class="text-xl font-extrabold text-slate-900">📋 Panel de Tareas</h2>
-            <p class="text-sm text-slate-500">
-                ${sesionActual.rol === 'admin' ? 'Ves todas las tareas del sistema.' :
-                  sesionActual.verTodasAreas ? 'Ves todas las áreas (permiso especial).' :
-                  'Ves solo tareas de tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
-            </p>
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h2 class="text-xl font-extrabold text-slate-900">📋 Panel de Tareas</h2>
+                <p class="text-sm text-slate-500">
+                    ${sesionActual.rol === 'admin' ? 'Ves todas las tareas del sistema.' :
+                      sesionActual.verTodasAreas ? 'Ves todas las áreas (permiso especial).' :
+                      'Ves solo tareas de tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
+                </p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
+                <button onclick="abrirModalExportCSV('tareas')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
+            </div>
         </div>
     `;
 
@@ -411,11 +400,17 @@ function generarPanelCalendario() {
     }
 
     return `
-        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-            <h2 class="text-xl font-extrabold text-slate-900 mb-1">📅 Calendario de Tareas</h2>
-            <p class="text-sm text-slate-500 mb-4">
-                ${sesionActual.rol === 'admin' || sesionActual.verTodasAreas ? 'Mostrando todas las áreas.' : 'Mostrando solo tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
-            </p>
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h2 class="text-xl font-extrabold text-slate-900 mb-1">📅 Calendario de Tareas</h2>
+                <p class="text-sm text-slate-500">
+                    ${sesionActual.rol === 'admin' || sesionActual.verTodasAreas ? 'Mostrando todas las áreas.' : 'Mostrando solo tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
+                </p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
+                <button onclick="abrirModalExportCSV('calendario')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
+            </div>
         </div>
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex justify-between items-center">
@@ -433,7 +428,7 @@ function generarPanelCalendario() {
     `;
 }
 
-// ================= PANEL: CATÁLOGOS (solo admin) =================
+// ================= PANEL: CATÁLOGOS =================
 function generarPanelCatalogos() {
     if (sesionActual.rol !== 'admin') return '<p class="text-sm text-rose-600">No tienes acceso a este panel.</p>';
     return `
@@ -474,7 +469,7 @@ function generarPanelCatalogos() {
     `;
 }
 
-// ================= PANEL: USUARIOS (solo admin) =================
+// ================= PANEL: USUARIOS =================
 function generarPanelUsuarios() {
     if (sesionActual.rol !== 'admin') return '<p class="text-sm text-rose-600">No tienes acceso a este panel.</p>';
 
@@ -666,14 +661,217 @@ async function agregarProyectoCatalogo() {
     renderizarInterfazPorRol();
 }
 
-// ================= EXPORTAR CSV =================
-function exportarCSV() {
-    let csv = "data:text/csv;charset=utf-8,\uFEFFReporte\nID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
-    dbTareas.forEach(t => { csv += `${t.id},"${t.titulo}","${t.area}","${t.proyecto}",${t.estado},${t.avance}%,${t.fechaLimite},"${t.responsable}"\n`; });
+// ================= MODAL EXPORTAR CSV =================
+function abrirModalExportCSV(origen = 'tareas') {
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const y = mesCalendario.getFullYear();
+    const m = mesCalendario.getMonth();
+
+    const modal = document.createElement('div');
+    modal.id = 'modalExportCSV';
+    modal.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-5">
+            <div class="text-center">
+                <h3 class="text-xl font-extrabold text-slate-900">📥 Exportar CSV</h3>
+                <p class="text-xs text-slate-500 mt-1">Origen: <strong>${origen === 'calendario' ? 'Calendario' : 'Panel de Tareas'}</strong></p>
+            </div>
+            <div class="space-y-3">
+                <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50">
+                    <input type="radio" name="alcanceCSV" value="mes" checked class="mt-1">
+                    <div>
+                        <div class="font-semibold text-sm">Mes actual</div>
+                        <div class="text-xs text-slate-500">Solo tareas con fecha límite en ${meses[m]} ${y}</div>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer hover:bg-slate-50">
+                    <input type="radio" name="alcanceCSV" value="todos" class="mt-1">
+                    <div>
+                        <div class="font-semibold text-sm">Todos</div>
+                        <div class="text-xs text-slate-500">Todas las tareas visibles para tu usuario</div>
+                    </div>
+                </label>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="cerrarModalExportCSV()" class="flex-1 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm transition">Cancelar</button>
+                <button onclick="ejecutarExportCSV('${origen}')" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm transition shadow">Exportar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+function cerrarModalExportCSV() {
+    const m = document.getElementById('modalExportCSV');
+    if (m) m.remove();
+}
+function ejecutarExportCSV(origen) {
+    const alcance = document.querySelector('input[name="alcanceCSV"]:checked').value;
+    const visibles = tareasVisiblesParaUsuario();
+    const y = mesCalendario.getFullYear();
+    const m = mesCalendario.getMonth();
+
+    let filtradas = visibles;
+    if (alcance === 'mes') {
+        filtradas = visibles.filter(t => {
+            if (!t.fechaLimite) return false;
+            const [yy, mm] = t.fechaLimite.split('-').map(Number);
+            return yy === y && (mm - 1) === m;
+        });
+    }
+
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    const nombreArchivo = `Reporte_${origen}_${alcance === 'mes' ? meses[m] + '_' + y : 'Todos'}.csv`;
+
+    let csv = "data:text/csv;charset=utf-8,\uFEFF";
+    csv += `Reporte de ${origen === 'calendario' ? 'Calendario' : 'Tareas'} — ${alcance === 'mes' ? meses[m] + ' ' + y : 'Todos los registros'}\n`;
+    csv += `Generado: ${new Date().toLocaleString()}\n`;
+    csv += `Usuario: ${sesionActual.nombre} (${sesionActual.rol})\n\n`;
+    csv += "ID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
+    filtradas.forEach(t => {
+        csv += `${t.id},"${t.titulo}","${t.area}","${t.proyecto}",${t.estado},${t.avance}%,${t.fechaLimite},"${t.responsable}"\n`;
+    });
+
     const a = document.createElement("a");
     a.setAttribute("href", encodeURI(csv));
-    a.setAttribute("download", "Reporte.csv");
+    a.setAttribute("download", nombreArchivo);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    cerrarModalExportCSV();
+    mostrarToast(`CSV exportado: ${filtradas.length} tareas.`);
+}
+
+// ================= INFORME EJECUTIVO =================
+function abrirInformeEjecutivo() {
+    const visibles = tareasVisiblesParaUsuario();
+    const total = visibles.length;
+    const concluidas = visibles.filter(t => t.estado === 'Concluida').length;
+    const pendientes = total - concluidas;
+    const avancePromedio = total > 0 ? Math.round(visibles.reduce((s, t) => s + (t.avance || 0), 0) / total) : 0;
+
+    const porArea = {};
+    visibles.forEach(t => {
+        porArea[t.area] = porArea[t.area] || { total: 0, concluidas: 0, avanceSuma: 0 };
+        porArea[t.area].total++;
+        if (t.estado === 'Concluida') porArea[t.area].concluidas++;
+        porArea[t.area].avanceSuma += (t.avance || 0);
+    });
+
+    const porProyecto = {};
+    visibles.forEach(t => {
+        porProyecto[t.proyecto] = porProyecto[t.proyecto] || { total: 0, concluidas: 0, avanceSuma: 0 };
+        porProyecto[t.proyecto].total++;
+        if (t.estado === 'Concluida') porProyecto[t.proyecto].concluidas++;
+        porProyecto[t.proyecto].avanceSuma += (t.avance || 0);
+    });
+
+    const hoy = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+    const alcance = sesionActual.rol === 'admin' ? 'Todas las áreas (Administrador)' :
+                    sesionActual.verTodasAreas ? 'Todas las áreas (permiso especial)' :
+                    `Área: ${sesionActual.area || 'Sin área'}`;
+
+    const filasArea = Object.entries(porArea).map(([area, d]) => {
+        const prom = Math.round(d.avanceSuma / d.total);
+        return `<tr><td>${area}</td><td style="text-align:center">${d.total}</td><td style="text-align:center">${d.concluidas}</td><td style="text-align:center">${d.total - d.concluidas}</td><td style="text-align:center">${prom}%</td></tr>`;
+    }).join('');
+
+    const filasProyecto = Object.entries(porProyecto).map(([proy, d]) => {
+        const prom = Math.round(d.avanceSuma / d.total);
+        return `<tr><td>${proy}</td><td style="text-align:center">${d.total}</td><td style="text-align:center">${d.concluidas}</td><td style="text-align:center">${prom}%</td></tr>`;
+    }).join('');
+
+    const filasTareas = visibles.map(t => `
+        <tr>
+            <td>${t.titulo}</td>
+            <td>${t.area}</td>
+            <td>${t.proyecto}</td>
+            <td>${t.responsable}</td>
+            <td style="text-align:center">${t.fechaLimite}</td>
+            <td style="text-align:center">${t.estado}</td>
+            <td style="text-align:center">${t.avance}%</td>
+        </tr>
+    `).join('');
+
+    const ventana = window.open('', '_blank');
+    ventana.document.write(`
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Informe Ejecutivo — Agenda Institucional</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 40px; line-height: 1.5; }
+        .header { border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { font-size: 26px; color: #1e3a8a; margin-bottom: 5px; }
+        .header .sub { font-size: 13px; color: #64748b; }
+        .meta { display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-top: 15px; flex-wrap: wrap; gap: 10px; }
+        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .kpi { background: #f8fafc; border-left: 4px solid #2563eb; padding: 15px; border-radius: 6px; }
+        .kpi .label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px; }
+        .kpi .value { font-size: 28px; font-weight: 800; color: #1e3a8a; margin-top: 4px; }
+        .kpi.verde { border-left-color: #10b981; }
+        .kpi.verde .value { color: #047857; }
+        .kpi.ambar { border-left-color: #f59e0b; }
+        .kpi.ambar .value { color: #b45309; }
+        h2 { font-size: 16px; color: #1e3a8a; margin: 30px 0 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+        th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: left; font-weight: 600; }
+        td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
+        .no-print { text-align: center; margin: 20px 0; }
+        .no-print button { background: #2563eb; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+        .no-print button:hover { background: #1d4ed8; }
+        @media print { .no-print { display: none; } body { padding: 20px; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Informe Ejecutivo — Agenda Institucional</h1>
+        <div class="sub">Reporte de avance de tareas y proyectos</div>
+        <div class="meta">
+            <div><strong>Fecha:</strong> ${hoy}</div>
+            <div><strong>Alcance:</strong> ${alcance}</div>
+            <div><strong>Generado por:</strong> ${sesionActual.nombre} (${sesionActual.rol})</div>
+        </div>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi"><div class="label">Total Tareas</div><div class="value">${total}</div></div>
+        <div class="kpi verde"><div class="label">Concluidas</div><div class="value">${concluidas}</div></div>
+        <div class="kpi ambar"><div class="label">Pendientes</div><div class="value">${pendientes}</div></div>
+        <div class="kpi"><div class="label">Avance Promedio</div><div class="value">${avancePromedio}%</div></div>
+    </div>
+
+    <h2>Resumen por Área</h2>
+    <table>
+        <thead><tr><th>Área</th><th style="text-align:center">Total</th><th style="text-align:center">Concluidas</th><th style="text-align:center">Pendientes</th><th style="text-align:center">Avance</th></tr></thead>
+        <tbody>${filasArea || '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin datos</td></tr>'}</tbody>
+    </table>
+
+    <h2>Resumen por Proyecto</h2>
+    <table>
+        <thead><tr><th>Proyecto</th><th style="text-align:center">Total</th><th style="text-align:center">Concluidas</th><th style="text-align:center">Avance</th></tr></thead>
+        <tbody>${filasProyecto || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Sin datos</td></tr>'}</tbody>
+    </table>
+
+    <h2>Detalle de Tareas</h2>
+    <table>
+        <thead><tr><th>Título</th><th>Área</th><th>Proyecto</th><th>Responsable</th><th style="text-align:center">Fecha Límite</th><th style="text-align:center">Estado</th><th style="text-align:center">Avance</th></tr></thead>
+        <tbody>${filasTareas || '<tr><td colspan="7" style="text-align:center;color:#94a3b8">Sin tareas</td></tr>'}</tbody>
+    </table>
+
+    <div class="footer">
+        Documento generado automáticamente por la Agenda Electrónica Institucional · ${hoy}
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+    </div>
+</body>
+</html>
+    `);
+    ventana.document.close();
 }
