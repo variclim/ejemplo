@@ -3,7 +3,7 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "passHash": "4f9a2b8c1d3e5f7a9b0c2d4e6f8a1b3c:7e5d3c1b9a8f6e4d2c0b1a3f5e7d9c8b6a4f2e0d1c3b5a7f9e8d6c4b2a1f3e5d",
+    "passHash": "d990f54274ade513ddd9564c8878e070:f3eb39bd41c6c635516dbbd98d26600b011f474a54e574dca96c53663e510744",
     "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": ""
