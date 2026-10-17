@@ -3,28 +3,9 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "passHash": "e419043b83e4a86d81ba1314684fe53c:912b35ac6c0d5f9d9d05fecbb5b62712284667b80c25e0b630dbe40724228624",
+    "passHash": "4f9a2b8c1d3e5f7a9b0c2d4e6f8a1b3c:7e5d3c1b9a8f6e4d2c0b1a3f5e7d9c8b6a4f2e0d1c3b5a7f9e8d6c4b2a1f3e5d",
     "rol": "admin",
     "area": "Coordinacion",
-    "perfil": "empresarial",
-    "tokenHash": ""
-  },
-  {
-    "id": 2,
-    "nombre": "Visualizador 1",
-    "usuario": "visualizador1",
-    "passHash": "REEMPLAZAR_AL_PRIMER_USO",
-    "rol": "visualizador",
-    "area": "Coordinacion",
-    "tokenHash": ""
-  },
-  {
-    "id": 7,
-    "nombre": "Editor 1",
-    "usuario": "editor1",
-    "passHash": "REEMPLAZAR_AL_PRIMER_USO",
-    "rol": "editor",
-    "area": "Sistemas",
     "tokenHash": ""
   }
 ]
