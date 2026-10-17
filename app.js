@@ -7,7 +7,7 @@ let tokenAdmin = sessionStorage.getItem('ae_github_token') || "";
 let sesionActual = JSON.parse(sessionStorage.getItem('ae_sesion')) || null;
 
 let dbUsuarios = [];
-let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: ['Proyecto General SLP'] };
+let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José'] };
 let dbTareas = [];
 
 const catalogosDefault = {
@@ -35,66 +35,87 @@ function mostrarToast(mensaje, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
-// ================= CARGA Y PERSISTENCIA =================
+// ================= CONEXIÓN CON GITHUB BLINDADA =================
 async function leerArchivoGitHub(ruta) {
-    const local = localStorage.getItem(`ae_local_${ruta}`);
-    if (local) {
-        try { return JSON.parse(local); } catch(e){}
-    }
-
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}`;
     try {
         const res = await fetch(url);
         if (res.ok) {
             const data = await res.json();
-            const contenido = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-            localStorage.setItem(`ae_local_${ruta}`, JSON.stringify(contenido));
-            return contenido;
+            const decoded = decodeURIComponent(escape(atob(data.content)));
+            return JSON.parse(decoded);
         }
-    } catch (e) { console.log(`Usando respaldo para ${ruta}`); }
+    } catch (e) {
+        console.log(`Error al leer ${ruta} de GitHub, usando respaldo local.`);
+    }
     return null;
 }
 
 async function cargarDatosDesdeGitHub() {
-    dbUsuarios = await leerArchivoGitHub('usuarios.json') || usuarioAdminDefault;
-    dbCatalogos = await leerArchivoGitHub('areas_proyectos.json') || catalogosDefault;
-    dbTareas = await leerArchivoGitHub('tareas.json') || [
-        { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
-    ];
-}
+    try {
+        const usuariosRemotos = await leerArchivoGitHub('usuarios.json');
+        dbUsuarios = Array.isArray(usuariosRemotos) && usuariosRemotos.length > 0 ? usuariosRemotos : usuarioAdminDefault;
 
-async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
-    localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
+        const catalogosRemotos = await leerArchivoGitHub('areas_proyectos.json');
+        dbCatalogos = catalogosRemotos && catalogosRemotos.areas ? catalogosRemotos : catalogosDefault;
 
-    if (sesionActual?.rol === 'admin' && tokenAdmin) {
-        const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
-        let sha = "";
-        try {
-            const resGet = await fetch(url, { headers: { "Authorization": `token ${tokenAdmin}` } });
-            if (resGet.ok) { const data = await resGet.json(); sha = data.sha; }
-        } catch (e) {}
-
-        const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
-        const resPut = await fetch(url, {
-            method: "PUT",
-            headers: { "Authorization": `token ${tokenAdmin}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ message: mensajeCommit, content: contenidoBase64, sha: sha, branch: GITHUB_BRANCH })
-        });
-
-        if (resPut.ok) {
-            mostrarToast('¡Sincronizado con GitHub con éxito!');
-            return true;
-        } else {
-            mostrarToast('Guardado local (Token de Admin rechazado en GitHub).', 'error');
-            return false;
-        }
-    } else {
-        mostrarToast('Cambios guardados localmente.');
-        return true;
+        const tareasRemotas = await leerArchivoGitHub('tareas.json');
+        dbTareas = Array.isArray(tareasRemotas) ? tareasRemotas : [
+            { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
+        ];
+    } catch (err) {
+        console.error("Error crítico cargando datos:", err);
+        dbUsuarios = usuarioAdminDefault;
+        dbCatalogos = catalogosDefault;
+        dbTareas = [];
     }
 }
 
-// ================= AUTENTICACIÓN (LOGIN) =================
+async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
+    if (!tokenAdmin) {
+        mostrarToast('Acción bloqueada: Se requiere el Token de Admin.', 'error');
+        return false;
+    }
+
+    const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
+    let sha = "";
+
+    try {
+        const resGet = await fetch(url, {
+            headers: { "Authorization": `token ${tokenAdmin}` }
+        });
+        if (resGet.ok) {
+            const data = await resGet.json();
+            sha = data.sha;
+        }
+    } catch (e) { console.log("Archivo nuevo o sin SHA previo"); }
+
+    const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
+
+    const resPut = await fetch(url, {
+        method: "PUT",
+        headers: {
+            "Authorization": `token ${tokenAdmin}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            message: mensajeCommit,
+            content: contenidoBase64,
+            sha: sha,
+            branch: GITHUB_BRANCH
+        })
+    });
+
+    if (resPut.ok) {
+        mostrarToast('¡Base de datos en GitHub actualizada con éxito!');
+        return true;
+    } else {
+        mostrarToast('Error al sincronizar con GitHub. Revisa tu Token.', 'error');
+        return false;
+    }
+}
+
+// ================= AUTENTICACIÓN =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
@@ -116,8 +137,6 @@ function procesarLogin() {
 
         cerrarModalLogin();
         mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
-        
-        // CORRECCIÓN CLAVE: Forzar renderizado inmediato de la interfaz según el rol
         renderizarInterfazPorRol();
     } else {
         alert('Usuario o contraseña incorrectos.');
@@ -273,7 +292,6 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
-            <!-- Módulo de Creación de Usuarios -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <h3 class="font-extrabold text-slate-900 text-lg">➕ Generar Nuevo Usuario y Rol</h3>
                 <div class="grid sm:grid-cols-4 gap-3">
@@ -288,7 +306,6 @@ function generarVistaAdmin() {
                 <button onclick="crearNuevoUsuario()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow transition">Crear Usuario</button>
             </div>
 
-            <!-- Gestión de Catálogos (Áreas y Proyectos) -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <h3 class="font-extrabold text-slate-900 text-lg">📁 Gestión de Catálogos</h3>
                 <div class="grid sm:grid-cols-2 gap-6">
@@ -311,7 +328,6 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
-            <!-- Módulo de Tareas del Administrador -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">📝 Registrar Nueva Tarea</h3>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -323,13 +339,11 @@ function generarVistaAdmin() {
                 <button onclick="agregarTareaAdminCreador()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow transition">Guardar Tarea</button>
             </div>
 
-            <!-- Gestión de Usuarios Registrados -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios Registrados</h3>
                 <div class="space-y-3">${htmlUsuariosAdmin}</div>
             </div>
 
-            <!-- Control Total de Tareas -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">📋 Control Total de Tareas</h3>
                 <div class="space-y-3">${htmlTareasAdmin}</div>
@@ -338,7 +352,7 @@ function generarVistaAdmin() {
     `;
 }
 
-// ================= ACCIONES DE ADMIN Y EDITORES =================
+// ================= ACCIONES =================
 async function crearNuevoUsuario() {
     const nombre = document.getElementById('nuevoNombreUser').value.trim();
     const usuario = document.getElementById('nuevoUserLogin').value.trim();
@@ -346,18 +360,18 @@ async function crearNuevoUsuario() {
     const rol = document.getElementById('nuevoUserRol').value;
 
     if (!nombre || !usuario || !pass) {
-        mostrarToast('Completa todos los campos para crear el usuario.', 'error');
+        mostrarToast('Completa todos los campos.', 'error');
         return;
     }
 
     dbUsuarios.push({ id: Date.now(), nombre, usuario, pass, rol });
-    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear nuevo usuario');
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario');
     mostrarToast('Usuario creado con éxito.');
     renderizarInterfazPorRol();
 }
 
 async function eliminarUsuario(id) {
-    if (confirm('¿Eliminar este usuario permanentemente?')) {
+    if (confirm('¿Eliminar usuario?')) {
         dbUsuarios = dbUsuarios.filter(u => u.id !== id);
         await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
         renderizarInterfazPorRol();
@@ -371,13 +385,13 @@ async function agregarTareaAdminCreador() {
     const fechaLimite = document.getElementById('adminTareaFecha').value;
 
     if (!titulo || !fechaLimite) {
-        mostrarToast('Completa el título y la fecha límite.', 'error');
+        mostrarToast('Completa el título y la fecha.', 'error');
         return;
     }
 
     dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: 'Administrador' });
-    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar tarea por admin');
-    mostrarToast('Tarea creada exitosamente.');
+    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar tarea admin');
+    mostrarToast('Tarea creada.');
     renderizarInterfazPorRol();
 }
 
@@ -388,13 +402,13 @@ async function agregarTareaEditor() {
     const fechaLimite = document.getElementById('nuevaTareaFecha').value;
 
     if (!titulo || !fechaLimite) {
-        mostrarToast('Completa el título y la fecha límite.', 'error');
+        mostrarToast('Completa los campos.', 'error');
         return;
     }
 
     dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: sesionActual.nombre });
-    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar nueva tarea');
-    mostrarToast('Tarea agregada exitosamente.');
+    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar tarea editor');
+    mostrarToast('Tarea agregada.');
     renderizarInterfazPorRol();
 }
 
@@ -420,7 +434,7 @@ async function toggleConcluirTarea(id) {
 }
 
 async function eliminarTareaAdmin(id) {
-    if (confirm('¿Eliminar esta tarea permanentemente?')) {
+    if (confirm('¿Eliminar tarea?')) {
         dbTareas = dbTareas.filter(t => t.id !== id);
         await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea');
         renderizarInterfazPorRol();
@@ -453,7 +467,7 @@ async function actualizarPasswordUser(id) {
     if (user && nuevoPass) {
         user.pass = nuevoPass;
         await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar password');
-        mostrarToast('Contraseña actualizada con éxito.');
+        mostrarToast('Contraseña actualizada.');
     }
 }
 
