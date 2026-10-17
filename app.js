@@ -52,44 +52,6 @@ async function verificarPassword(passwordPlano, almacenado) {
     return bufferToHex(derivedBits) === hashHex;
 }
 
-// ================= USUARIOS POR DEFECTO (se hashean al arrancar) =================
-// Estructura EXACTA que usas: id, nombre, usuario, pass, rol, area, tokenHash
-// El campo "pass" aquí es temporal; al arrancar se convierte a "passHash" y se elimina "pass".
-const usuariosDefaultRaw = [
-    { id: 1,  nombre: 'Administrador General', usuario: 'admin',       pass: 'admin123', rol: 'admin',        area: 'Coordinacion', tokenHash: '' },
-    { id: 2,  nombre: 'Visualizador 1',        usuario: 'visualizador1', pass: 'vis123',  rol: 'visualizador', area: 'Coordinacion', tokenHash: '' },
-    { id: 3,  nombre: 'Visualizador 2',        usuario: 'visualizador2', pass: 'vis123',  rol: 'visualizador', area: 'Coordinacion', tokenHash: '' },
-    { id: 4,  nombre: 'Visualizador 3',        usuario: 'visualizador3', pass: 'vis123',  rol: 'visualizador', area: 'Coordinacion', tokenHash: '' },
-    { id: 5,  nombre: 'Visualizador 4',        usuario: 'visualizador4', pass: 'vis123',  rol: 'visualizador', area: 'Coordinacion', tokenHash: '' },
-    { id: 6,  nombre: 'Visualizador 5',        usuario: 'visualizador5', pass: 'vis123',  rol: 'visualizador', area: 'Coordinacion', tokenHash: '' },
-    { id: 7,  nombre: 'Editor 1',              usuario: 'editor1',      pass: 'edit123', rol: 'editor',       area: 'Sistemas',    tokenHash: '' },
-    { id: 8,  nombre: 'Editor 2',              usuario: 'editor2',      pass: 'edit123', rol: 'editor',       area: 'Sistemas',    tokenHash: '' },
-    { id: 9,  nombre: 'Editor 3',              usuario: 'editor3',      pass: 'edit123', rol: 'editor',       area: 'Sistemas',    tokenHash: '' },
-    { id: 10, nombre: 'Editor 4',              usuario: 'editor4',      pass: 'edit123', rol: 'editor',       area: 'Sistemas',    tokenHash: '' },
-    { id: 11, nombre: 'Editor 5',              usuario: 'editor5',      pass: 'edit123', rol: 'editor',       area: 'Sistemas',    tokenHash: '' }
-];
-
-// Convierte un array de usuarios con "pass" en texto plano a "passHash"
-async function hashearUsuarios(lista) {
-    const resultado = [];
-    for (const u of lista) {
-        const copia = { ...u };
-        if (copia.pass && !copia.passHash) {
-            copia.passHash = await generarHashPassword(copia.pass);
-            delete copia.pass;
-        }
-        resultado.push(copia);
-    }
-    return resultado;
-}
-
-async function inicializarUsuariosDefault() {
-    if (!usuariosDefaultRaw._hashed) {
-        usuariosDefaultRaw._hashed = await hashearUsuarios(usuariosDefaultRaw);
-    }
-    return usuariosDefaultRaw._hashed;
-}
-
 // ================= ARRANQUE =================
 window.addEventListener('DOMContentLoaded', async () => {
     await cargarDatosDesdeGitHub();
@@ -119,20 +81,12 @@ async function leerArchivoGitHub(ruta) {
 }
 
 async function cargarDatosDesdeGitHub() {
-    // ---------- USUARIOS ----------
-    let usuariosRemotos = await leerArchivoGitHub('usuarios.json');
-    const usuariosDefaultHasheados = await inicializarUsuariosDefault();
-
-    // Si el JSON está vacío, no es array, o solo tiene objetos sin pass/passHash → usar defaults
-    const usuariosRemotosValidos = Array.isArray(usuariosRemotos) && usuariosRemotos.length > 0
-        ? usuariosRemotos.filter(u => u && u.usuario && (u.passHash || u.pass))
-        : [];
-
-    if (usuariosRemotosValidos.length > 0) {
-        // Migración: si viene "pass" en texto plano, hashearlo
-        dbUsuarios = await hashearUsuarios(usuariosRemotosValidos);
+    // ---------- USUARIOS (solo desde JSON, sin defaults) ----------
+    const usuariosRemotos = await leerArchivoGitHub('usuarios.json');
+    if (Array.isArray(usuariosRemotos) && usuariosRemotos.length > 0) {
+        dbUsuarios = usuariosRemotos.filter(u => u && u.usuario && (u.passHash || u.pass));
     } else {
-        dbUsuarios = usuariosDefaultHasheados;
+        dbUsuarios = [];
     }
 
     // ---------- CATÁLOGOS ----------
@@ -148,18 +102,15 @@ async function cargarDatosDesdeGitHub() {
     if (Array.isArray(tareasRemotas) && tareasRemotas.length > 0) {
         dbTareas = tareasRemotas;
     } else {
-        dbTareas = [
-            { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Editor 1' },
-            { id: 2, titulo: 'Calibración Estación Meteorológica', area: 'Meteorologia', proyecto: 'Atlas de Riesgo Municipal', estado: 'Concluida', avance: 100, fechaLimite: '2026-04-10', responsable: 'Editor 2' }
-        ];
+        dbTareas = [];
     }
 }
 
 async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     const tokenUsar = tokenAdmin || sessionStorage.getItem('ae_github_token');
     if (!tokenUsar) {
-        // Sin token: solo se guarda en memoria (la sesión actual)
-        return true;
+        mostrarToast('Sin token de GitHub: el cambio solo vive en esta sesión.', 'error');
+        return false;
     }
 
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
@@ -194,23 +145,19 @@ async function procesarLogin() {
     const pass = document.getElementById('loginPassword').value.trim();
     const token = document.getElementById('loginTokenGitHub').value.trim();
 
-    const encontrado = dbUsuarios.find(u => u.usuario === user);
-    if (!encontrado) {
-        alert('Usuario o contraseña incorrectos.');
+    if (dbUsuarios.length === 0) {
+        alert('No hay usuarios registrados. Crea el primer administrador desde el botón "Crear primer admin".');
         return;
     }
 
-    // Compatibilidad: passHash (nuevo) o pass (legado)
+    const encontrado = dbUsuarios.find(u => u.usuario === user);
+    if (!encontrado) { alert('Usuario o contraseña incorrectos.'); return; }
+
     const hashAlmacenado = encontrado.passHash || encontrado.pass || '';
     const esLegado = !encontrado.passHash && encontrado.pass;
-
     const ok = await verificarPassword(pass, hashAlmacenado);
-    if (!ok) {
-        alert('Usuario o contraseña incorrectos.');
-        return;
-    }
+    if (!ok) { alert('Usuario o contraseña incorrectos.'); return; }
 
-    // Migración automática si era texto plano
     if (esLegado) {
         encontrado.passHash = await generarHashPassword(pass);
         delete encontrado.pass;
@@ -219,10 +166,7 @@ async function procesarLogin() {
 
     sesionActual = encontrado;
     sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
-    if (token) {
-        tokenAdmin = token;
-        sessionStorage.setItem('ae_github_token', token);
-    }
+    if (token) { tokenAdmin = token; sessionStorage.setItem('ae_github_token', token); }
     cerrarModalLogin();
     mostrarToast(`¡Bienvenido, ${encontrado.nombre} (${encontrado.rol.toUpperCase()})!`);
     renderizarInterfazPorRol();
@@ -334,7 +278,6 @@ function generarVistaAdmin() {
         </div>
     `).join('');
 
-    // No mostramos la contraseña. Solo permitimos resetear.
     const htmlUsuariosAdmin = dbUsuarios.map(u => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
             <div>
@@ -343,6 +286,7 @@ function generarVistaAdmin() {
             <div class="flex gap-2 w-full sm:w-auto">
                 <input type="password" id="pass_${u.id}" placeholder="Nueva contraseña" class="flex-1 sm:w-48 px-3 py-1.5 border rounded-lg text-xs">
                 <button onclick="actualizarPasswordUser(${u.id})" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold">Resetear</button>
+                <button onclick="eliminarUsuarioAdmin(${u.id})" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-semibold">Eliminar</button>
             </div>
         </div>
     `).join('');
@@ -355,8 +299,8 @@ function generarVistaAdmin() {
                     <h3 class="text-3xl font-extrabold text-slate-900 mt-1">${dbTareas.length}</h3>
                 </div>
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                    <span class="text-xs font-bold text-slate-400 uppercase">Tareas Concluidas</span>
-                    <h3 class="text-3xl font-extrabold text-emerald-600 mt-1">${dbTareas.filter(t => t.estado === 'Concluida').length}</h3>
+                    <span class="text-xs font-bold text-slate-400 uppercase">Usuarios</span>
+                    <h3 class="text-3xl font-extrabold text-blue-600 mt-1">${dbUsuarios.length}</h3>
                 </div>
                 <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between">
                     <span class="text-xs font-bold text-slate-400 uppercase">Informes y Exportación</span>
@@ -364,6 +308,26 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
+            <!-- Crear nuevo usuario -->
+            <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+                <h3 class="font-extrabold text-slate-900 text-lg">➕ Crear Nuevo Usuario</h3>
+                <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <input type="text" id="nuevoUserNombre" placeholder="Nombre completo" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="text" id="nuevoUserUsuario" placeholder="Usuario (login)" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="password" id="nuevoUserPass" placeholder="Contraseña (mín. 8)" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <select id="nuevoUserRol" class="px-4 py-2.5 border rounded-xl text-sm bg-white">
+                        <option value="visualizador">Visualizador</option>
+                        <option value="editor">Editor</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                    <select id="nuevoUserArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">
+                        ${dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('')}
+                    </select>
+                </div>
+                <button onclick="crearUsuarioAdmin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow transition">Crear Usuario</button>
+            </div>
+
+            <!-- Gestión de catálogos -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <h3 class="font-extrabold text-slate-900 text-lg">📁 Gestión de Catálogos</h3>
                 <div class="grid sm:grid-cols-2 gap-6">
@@ -386,90 +350,55 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
+            <!-- Gestión de usuarios -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios (Resetear Contraseña)</h3>
-                <p class="text-xs text-slate-500">Por seguridad, las contraseñas no son visibles. Solo puedes asignar una nueva.</p>
-                <div class="space-y-3">${htmlUsuariosAdmin}</div>
+                <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios</h3>
+                <p class="text-xs text-slate-500">Las contraseñas no son visibles. Solo puedes resetearlas o eliminar el usuario.</p>
+                <div class="space-y-3">${htmlUsuariosAdmin || '<p class="text-sm text-slate-400">No hay usuarios.</p>'}</div>
             </div>
 
+            <!-- Control de tareas -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
                 <h3 class="font-extrabold text-slate-900 text-lg">📋 Control Total de Tareas</h3>
-                <div class="space-y-3">${htmlTareasAdmin}</div>
+                <div class="space-y-3">${htmlTareasAdmin || '<p class="text-sm text-slate-400">No hay tareas.</p>'}</div>
             </div>
         </div>
     `;
 }
 
 // ================= ACCIONES =================
-async function agregarTareaEditor() {
-    const titulo = document.getElementById('nuevaTareaTitulo').value.trim();
-    const area = document.getElementById('nuevaTareaArea').value;
-    const proyecto = document.getElementById('nuevaTareaProyecto').value;
-    const fechaLimite = document.getElementById('nuevaTareaFecha').value;
+async function crearUsuarioAdmin() {
+    const nombre = document.getElementById('nuevoUserNombre').value.trim();
+    const usuario = document.getElementById('nuevoUserUsuario').value.trim();
+    const pass = document.getElementById('nuevoUserPass').value.trim();
+    const rol = document.getElementById('nuevoUserRol').value;
+    const area = document.getElementById('nuevoUserArea').value;
 
-    if (!titulo || !fechaLimite) {
-        mostrarToast('Completa el título y la fecha límite.', 'error');
-        return;
-    }
+    if (!nombre || !usuario || !pass) { mostrarToast('Completa nombre, usuario y contraseña.', 'error'); return; }
+    if (pass.length < 8) { mostrarToast('La contraseña debe tener al menos 8 caracteres.', 'error'); return; }
+    if (dbUsuarios.some(u => u.usuario === usuario)) { mostrarToast('Ese usuario ya existe.', 'error'); return; }
 
-    dbTareas.push({
-        id: Date.now(), titulo, area, proyecto,
-        estado: 'Pendiente', avance: 0, fechaLimite,
-        responsable: sesionActual.nombre
-    });
-
-    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar nueva tarea');
-    mostrarToast('Tarea agregada exitosamente.');
+    const nuevo = {
+        id: Date.now(),
+        nombre, usuario,
+        passHash: await generarHashPassword(pass),
+        rol, area,
+        tokenHash: ''
+    };
+    dbUsuarios.push(nuevo);
+    await guardarEnGitHub('usuarios.json', dbUsuarios, `Crear usuario ${usuario}`);
+    mostrarToast('Usuario creado.');
     renderizarInterfazPorRol();
 }
 
-async function actualizarAvanceTarea(id, nuevoAvance) {
-    const tarea = dbTareas.find(t => t.id === id);
-    if (tarea) {
-        tarea.avance = parseInt(nuevoAvance) || 0;
-        if (tarea.avance >= 100) { tarea.avance = 100; tarea.estado = 'Concluida'; }
-        else if (tarea.estado === 'Concluida') { tarea.estado = 'Pendiente'; }
-        await guardarEnGitHub('tareas.json', dbTareas, 'Actualizar avance de tarea');
-        renderizarInterfazPorRol();
-    }
-}
-
-async function toggleConcluirTarea(id) {
-    const tarea = dbTareas.find(t => t.id === id);
-    if (tarea) {
-        tarea.estado = tarea.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
-        if (tarea.estado === 'Concluida') tarea.avance = 100;
-        await guardarEnGitHub('tareas.json', dbTareas, 'Cambiar estado de tarea');
-        renderizarInterfazPorRol();
-    }
-}
-
-async function eliminarTareaAdmin(id) {
-    if (confirm('¿Eliminar esta tarea permanentemente?')) {
-        dbTareas = dbTareas.filter(t => t.id !== id);
-        await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea admin');
-        renderizarInterfazPorRol();
-    }
-}
-
-async function agregarAreaCatalogo() {
-    const area = document.getElementById('nuevoAreaInput').value.trim();
-    if (area && !dbCatalogos.areas.includes(area)) {
-        dbCatalogos.areas.push(area);
-        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar nueva área');
-        mostrarToast('Área agregada.');
-        renderizarInterfazPorRol();
-    }
-}
-
-async function agregarProyectoCatalogo() {
-    const proj = document.getElementById('nuevoProyectoInput').value.trim();
-    if (proj && !dbCatalogos.proyectos.includes(proj)) {
-        dbCatalogos.proyectos.push(proj);
-        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar nuevo proyecto');
-        mostrarToast('Proyecto agregado.');
-        renderizarInterfazPorRol();
-    }
+async function eliminarUsuarioAdmin(id) {
+    if (dbUsuarios.length <= 1) { mostrarToast('No puedes eliminar el último usuario.', 'error'); return; }
+    const user = dbUsuarios.find(u => u.id === id);
+    if (!confirm(`¿Eliminar a ${user?.nombre}?`)) return;
+    dbUsuarios = dbUsuarios.filter(u => u.id !== id);
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
+    mostrarToast('Usuario eliminado.');
+    renderizarInterfazPorRol();
 }
 
 async function actualizarPasswordUser(id) {
@@ -477,17 +406,69 @@ async function actualizarPasswordUser(id) {
     const nuevoPass = inputPass.value.trim();
     const user = dbUsuarios.find(u => u.id === id);
     if (!user) return;
-    if (!nuevoPass || nuevoPass.length < 8) {
-        mostrarToast('La contraseña debe tener al menos 8 caracteres.', 'error');
-        return;
-    }
+    if (!nuevoPass || nuevoPass.length < 8) { mostrarToast('La contraseña debe tener al menos 8 caracteres.', 'error'); return; }
     user.passHash = await generarHashPassword(nuevoPass);
     delete user.pass;
-    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Resetear contraseña de usuario');
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Resetear contraseña');
     inputPass.value = '';
-    mostrarToast('Contraseña actualizada con éxito.');
+    mostrarToast('Contraseña actualizada.');
 }
 
+async function agregarTareaEditor() {
+    const titulo = document.getElementById('nuevaTareaTitulo').value.trim();
+    const area = document.getElementById('nuevaTareaArea').value;
+    const proyecto = document.getElementById('nuevaTareaProyecto').value;
+    const fechaLimite = document.getElementById('nuevaTareaFecha').value;
+    if (!titulo || !fechaLimite) { mostrarToast('Completa el título y la fecha límite.', 'error'); return; }
+    dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: sesionActual.nombre });
+    await guardarEnGitHub('tareas.json', dbTareas, 'Agregar nueva tarea');
+    mostrarToast('Tarea agregada.');
+    renderizarInterfazPorRol();
+}
+async function actualizarAvanceTarea(id, nuevoAvance) {
+    const tarea = dbTareas.find(t => t.id === id);
+    if (tarea) {
+        tarea.avance = parseInt(nuevoAvance) || 0;
+        if (tarea.avance >= 100) { tarea.avance = 100; tarea.estado = 'Concluida'; }
+        else if (tarea.estado === 'Concluida') { tarea.estado = 'Pendiente'; }
+        await guardarEnGitHub('tareas.json', dbTareas, 'Actualizar avance');
+        renderizarInterfazPorRol();
+    }
+}
+async function toggleConcluirTarea(id) {
+    const tarea = dbTareas.find(t => t.id === id);
+    if (tarea) {
+        tarea.estado = tarea.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
+        if (tarea.estado === 'Concluida') tarea.avance = 100;
+        await guardarEnGitHub('tareas.json', dbTareas, 'Cambiar estado');
+        renderizarInterfazPorRol();
+    }
+}
+async function eliminarTareaAdmin(id) {
+    if (confirm('¿Eliminar esta tarea permanentemente?')) {
+        dbTareas = dbTareas.filter(t => t.id !== id);
+        await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea');
+        renderizarInterfazPorRol();
+    }
+}
+async function agregarAreaCatalogo() {
+    const area = document.getElementById('nuevoAreaInput').value.trim();
+    if (area && !dbCatalogos.areas.includes(area)) {
+        dbCatalogos.areas.push(area);
+        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar área');
+        mostrarToast('Área agregada.');
+        renderizarInterfazPorRol();
+    }
+}
+async function agregarProyectoCatalogo() {
+    const proj = document.getElementById('nuevoProyectoInput').value.trim();
+    if (proj && !dbCatalogos.proyectos.includes(proj)) {
+        dbCatalogos.proyectos.push(proj);
+        await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar proyecto');
+        mostrarToast('Proyecto agregado.');
+        renderizarInterfazPorRol();
+    }
+}
 function exportarCSV() {
     let csv = "data:text/csv;charset=utf-8,\uFEFFReporte de Agenda Institucional\n";
     csv += "ID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
