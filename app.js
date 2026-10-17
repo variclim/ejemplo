@@ -13,7 +13,6 @@ let dbCatalogos = {
 };
 let dbTareas = [];
 
-// Estado de UI
 let tabActual = 'todas';
 let mesCalendario = new Date();
 
@@ -25,21 +24,34 @@ const catalogosDefault = {
 // ================= HASH PBKDF2 =================
 const PBKDF2_ITERATIONS = 310000;
 const PBKDF2_KEYLEN = 32;
-function bufferToHex(buffer) { return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join(''); }
-function hexToBuffer(hex) { const b = new Uint8Array(hex.length/2); for (let i=0;i<b.length;i++) b[i]=parseInt(hex.substr(i*2,2),16); return b.buffer; }
+
+function bufferToHex(buffer) {
+    return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+function hexToBuffer(hex) {
+    const b = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return b.buffer;
+}
 async function generarHashPassword(p) {
     const enc = new TextEncoder();
     const salt = crypto.getRandomValues(new Uint8Array(16));
-    const km = await crypto.subtle.importKey("raw", enc.encode(p), { name:"PBKDF2" }, false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt, iterations:PBKDF2_ITERATIONS, hash:"SHA-256" }, km, PBKDF2_KEYLEN*8);
+    const km = await crypto.subtle.importKey("raw", enc.encode(p), { name: "PBKDF2" }, false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+        km, PBKDF2_KEYLEN * 8
+    );
     return bufferToHex(salt) + ":" + bufferToHex(bits);
 }
 async function verificarPassword(p, almacenado) {
     if (!almacenado || !almacenado.includes(":")) return p === almacenado;
     const [saltHex, hashHex] = almacenado.split(":");
     const enc = new TextEncoder();
-    const km = await crypto.subtle.importKey("raw", enc.encode(p), { name:"PBKDF2" }, false, ["deriveBits"]);
-    const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", salt:hexToBuffer(saltHex), iterations:PBKDF2_ITERATIONS, hash:"SHA-256" }, km, PBKDF2_KEYLEN*8);
+    const km = await crypto.subtle.importKey("raw", enc.encode(p), { name: "PBKDF2" }, false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits(
+        { name: "PBKDF2", salt: hexToBuffer(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+        km, PBKDF2_KEYLEN * 8
+    );
     return bufferToHex(bits) === hashHex;
 }
 
@@ -50,11 +62,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     actualizarIndicadorToken();
 });
 
-function mostrarToast(m, tipo='success') {
+function mostrarToast(m, tipo = 'success') {
     const t = document.getElementById('toast');
     if (!t) { alert(m); return; }
     t.textContent = m;
-    t.className = `fixed top-5 right-5 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all duration-300 ${tipo==='success'?'bg-emerald-600':'bg-rose-600'}`;
+    t.className = `fixed top-5 right-5 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all duration-300 ${tipo === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
     t.classList.remove('hidden');
     setTimeout(() => t.classList.add('hidden'), 3500);
 }
@@ -65,17 +77,30 @@ function abrirModalToken() {
     actualizarEstadoTokenModal();
     document.getElementById('modalToken').classList.remove('hidden');
 }
-function cerrarModalToken() { document.getElementById('modalToken').classList.add('hidden'); }
+function cerrarModalToken() {
+    document.getElementById('modalToken').classList.add('hidden');
+}
 function actualizarEstadoTokenModal() {
     const el = document.getElementById('tokenEstado');
-    if (tokenAdmin) { el.textContent = '✅ Token configurado'; el.className = 'text-xs font-semibold text-emerald-600'; }
-    else { el.textContent = '⚠️ Sin token: los cambios no se guardarán en GitHub'; el.className = 'text-xs font-semibold text-amber-600'; }
+    if (!el) return;
+    if (tokenAdmin) {
+        el.textContent = '✅ Token configurado';
+        el.className = 'text-xs font-semibold text-emerald-600';
+    } else {
+        el.textContent = '⚠️ Sin token: los cambios no se guardarán en GitHub';
+        el.className = 'text-xs font-semibold text-amber-600';
+    }
 }
 function actualizarIndicadorToken() {
     const btn = document.getElementById('btnToken');
     if (!btn) return;
-    if (tokenAdmin) { btn.textContent = '✅ Token'; btn.className = 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-2 rounded-xl transition'; }
-    else { btn.textContent = '⚙️ Token'; btn.className = 'bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-semibold px-3 py-2 rounded-xl transition'; }
+    if (tokenAdmin) {
+        btn.textContent = '✅ Token';
+        btn.className = 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-2 rounded-xl transition';
+    } else {
+        btn.textContent = '⚙️ Token';
+        btn.className = 'bg-amber-100 hover:bg-amber-200 text-amber-700 text-xs font-semibold px-3 py-2 rounded-xl transition';
+    }
 }
 function guardarToken() {
     const v = document.getElementById('tokenInput').value.trim();
@@ -99,7 +124,10 @@ async function leerArchivoGitHub(ruta) {
     const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}?t=${Date.now()}`;
     try {
         const res = await fetch(url, { cache: 'no-store' });
-        if (res.ok) { const d = await res.json(); return JSON.parse(decodeURIComponent(escape(atob(d.content)))); }
+        if (res.ok) {
+            const d = await res.json();
+            return JSON.parse(decodeURIComponent(escape(atob(d.content))));
+        }
     } catch (e) { console.log('Error leyendo', ruta, e); }
     return null;
 }
@@ -124,7 +152,7 @@ async function guardarEnGitHub(ruta, obj, msg) {
     const res = await fetch(url, {
         method: "PUT",
         headers: { "Authorization": `token ${tok}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg, content, sha, branch: GITHUB_BRANCH })
+        body: JSON.stringify({ message: msg, content: content, sha: sha, branch: GITHUB_BRANCH })
     });
     if (res.ok) { mostrarToast('¡Guardado en GitHub!'); return true; }
     mostrarToast('Error al guardar. Revisa tu token.', 'error');
@@ -134,20 +162,33 @@ async function guardarEnGitHub(ruta, obj, msg) {
 // ================= LOGIN =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
+
 async function procesarLogin() {
-    const user = document.getElementById('loginUser').value.trim();
-    const pass = document.getElementById('loginPassword').value.trim();
-    if (dbUsuarios.length === 0) { alert('No hay usuarios. Crea el primero desde la consola o el JSON.'); return; }
+    const userEl = document.getElementById('loginUser');
+    const passEl = document.getElementById('loginPassword');
+    if (!userEl || !passEl) { alert('Error: inputs de login no encontrados.'); return; }
+
+    const user = userEl.value.trim();
+    const pass = passEl.value.trim();
+
+    if (dbUsuarios.length === 0) {
+        alert('No hay usuarios registrados. Crea el primero desde la consola o el JSON.');
+        return;
+    }
+
     const u = dbUsuarios.find(x => x.usuario === user);
     if (!u) { alert('Usuario o contraseña incorrectos.'); return; }
+
     const ok = await verificarPassword(pass, u.passHash || u.pass || '');
     if (!ok) { alert('Usuario o contraseña incorrectos.'); return; }
+
     sesionActual = u;
     sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
     cerrarModalLogin();
     mostrarToast(`¡Bienvenido, ${u.nombre}!`);
     renderizarInterfazPorRol();
 }
+
 function cerrarSesion() {
     sessionStorage.removeItem('ae_sesion');
     sesionActual = null;
@@ -157,12 +198,16 @@ function cerrarSesion() {
 // ================= RENDER =================
 function renderizarInterfazPorRol() {
     const nav = document.getElementById('navSessionInfo');
-    const colores = { admin:'bg-purple-100 text-purple-800', editor:'bg-blue-100 text-blue-800', visualizador:'bg-emerald-100 text-emerald-800' };
+    const colores = {
+        admin: 'bg-purple-100 text-purple-800',
+        editor: 'bg-blue-100 text-blue-800',
+        visualizador: 'bg-emerald-100 text-emerald-800'
+    };
     nav.innerHTML = `
         <button id="btnToken" onclick="abrirModalToken()" class="text-xs font-semibold px-3 py-2 rounded-xl transition">⚙️ Token</button>
         <div class="text-right">
             <span class="block text-xs font-bold text-slate-800">${sesionActual.nombre}</span>
-            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${colores[sesionActual.rol]||'bg-slate-100'}">${sesionActual.rol}</span>
+            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${colores[sesionActual.rol] || 'bg-slate-100'}">${sesionActual.rol}</span>
         </div>
         <button onclick="cerrarSesion()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">Salir</button>
     `;
@@ -173,7 +218,7 @@ function renderizarInterfazPorRol() {
     else c.innerHTML = generarVistaAdmin();
 }
 
-// ================= TABS + CALENDARIO (reutilizable) =================
+// ================= TABS + CALENDARIO =================
 function generarTabsYCalendario(esEditor) {
     const filtradas = dbTareas.filter(t => {
         if (tabActual === 'todas') return true;
@@ -184,9 +229,9 @@ function generarTabsYCalendario(esEditor) {
 
     const tabs = `
         <div class="flex gap-2 border-b border-slate-200 pb-2">
-            ${['todas','pendientes','concluidas'].map(t => `
-                <button onclick="cambiarTab('${t}')" class="px-4 py-2 text-xs font-bold rounded-xl transition ${tabActual===t?'bg-blue-600 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
-                    ${t.charAt(0).toUpperCase()+t.slice(1)} (${t==='todas'?dbTareas.length:t==='pendientes'?dbTareas.filter(x=>x.estado!=='Concluida').length:dbTareas.filter(x=>x.estado==='Concluida').length})
+            ${['todas', 'pendientes', 'concluidas'].map(t => `
+                <button onclick="cambiarTab('${t}')" class="px-4 py-2 text-xs font-bold rounded-xl transition ${tabActual === t ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                    ${t.charAt(0).toUpperCase() + t.slice(1)} (${t === 'todas' ? dbTareas.length : t === 'pendientes' ? dbTareas.filter(x => x.estado !== 'Concluida').length : dbTareas.filter(x => x.estado === 'Concluida').length})
                 </button>
             `).join('')}
         </div>
@@ -209,9 +254,9 @@ function generarTabsYCalendario(esEditor) {
                 </div>
                 ${esEditor ? `
                     <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvanceTarea(${t.id}, this.value)" class="w-16 px-2 py-1.5 border rounded-xl text-xs text-center">
-                    <button onclick="toggleConcluirTarea(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado==='Concluida'?'bg-emerald-600 text-white':'bg-slate-100 text-slate-700'}">${t.estado}</button>
+                    <button onclick="toggleConcluirTarea(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">${t.estado}</button>
                 ` : `
-                    <span class="px-3 py-1 text-xs font-semibold rounded-xl ${t.estado==='Concluida'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}">${t.estado}</span>
+                    <span class="px-3 py-1 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${t.estado}</span>
                 `}
             </div>
         </div>
@@ -230,13 +275,12 @@ function generarCalendario() {
     const y = mesCalendario.getFullYear();
     const m = mesCalendario.getMonth();
     const primerDia = new Date(y, m, 1);
-    const ultimoDia = new Date(y, m+1, 0);
+    const ultimoDia = new Date(y, m + 1, 0);
     const diasMes = ultimoDia.getDate();
-    const inicioSemana = primerDia.getDay(); // 0=dom
-    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    const diasSem = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const inicioSemana = primerDia.getDay();
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const diasSem = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-    // Mapa de tareas por fecha YYYY-MM-DD
     const porFecha = {};
     dbTareas.forEach(t => {
         if (t.fechaLimite) {
@@ -247,17 +291,17 @@ function generarCalendario() {
     let celdas = '';
     for (let i = 0; i < inicioSemana; i++) celdas += `<div class="h-20"></div>`;
     for (let d = 1; d <= diasMes; d++) {
-        const fechaStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const fechaStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const tareasDia = porFecha[fechaStr] || [];
         const hoy = new Date();
         const esHoy = d === hoy.getDate() && m === hoy.getMonth() && y === hoy.getFullYear();
         celdas += `
-            <div class="h-20 border border-slate-100 rounded-lg p-1.5 text-xs ${esHoy?'bg-blue-50 border-blue-300':''}">
-                <div class="font-bold text-slate-700 ${esHoy?'text-blue-700':''}">${d}</div>
-                ${tareasDia.slice(0,2).map(t => `
-                    <div class="mt-0.5 truncate text-[10px] px-1 py-0.5 rounded ${t.estado==='Concluida'?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}" title="${t.titulo}">${t.titulo}</div>
+            <div class="h-20 border border-slate-100 rounded-lg p-1.5 text-xs ${esHoy ? 'bg-blue-50 border-blue-300' : ''}">
+                <div class="font-bold text-slate-700 ${esHoy ? 'text-blue-700' : ''}">${d}</div>
+                ${tareasDia.slice(0, 2).map(t => `
+                    <div class="mt-0.5 truncate text-[10px] px-1 py-0.5 rounded ${t.estado === 'Concluida' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}" title="${t.titulo}">${t.titulo}</div>
                 `).join('')}
-                ${tareasDia.length > 2 ? `<div class="text-[10px] text-slate-400">+${tareasDia.length-2} más</div>` : ''}
+                ${tareasDia.length > 2 ? `<div class="text-[10px] text-slate-400">+${tareasDia.length - 2} más</div>` : ''}
             </div>
         `;
     }
@@ -281,7 +325,7 @@ function generarCalendario() {
 }
 
 function cambiarTab(t) { tabActual = t; renderizarInterfazPorRol(); }
-function cambiarMes(delta) { mesCalendario.setMonth(mesCalendario.getMonth()+delta); renderizarInterfazPorRol(); }
+function cambiarMes(delta) { mesCalendario.setMonth(mesCalendario.getMonth() + delta); renderizarInterfazPorRol(); }
 
 // ================= VISTAS =================
 function generarVistaVisualizador() {
@@ -354,7 +398,7 @@ function generarVistaAdmin() {
                         <option value="editor">Editor</option>
                         <option value="admin">Admin</option>
                     </select>
-                    <select id="nuevoUserArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${dbCatalogos.areas.map(a=>`<option value="${a}">${a}</option>`).join('')}</select>
+                    <select id="nuevoUserArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('')}</select>
                 </div>
                 <button onclick="crearUsuarioAdmin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow">Crear Usuario</button>
             </div>
@@ -482,5 +526,7 @@ function exportarCSV() {
     const a = document.createElement("a");
     a.setAttribute("href", encodeURI(csv));
     a.setAttribute("download", "Reporte.csv");
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 }
