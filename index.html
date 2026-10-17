@@ -1,72 +1,49 @@
 <!DOCTYPE html>
-<html lang="es" class="scroll-smooth">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Institucional Avanzada</title>
-    <!-- Tailwind CSS -->
+    <title>Agenda Institucional</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased min-h-screen py-8 px-4">
+<body class="bg-slate-50 min-h-screen">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-        <!-- Notificación Flotante -->
-        <div id="toast" class="fixed top-5 right-5 z-50 hidden px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all z-[99999]"></div>
+    <!-- Barra de navegación -->
+    <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+        <h1 class="text-lg font-extrabold text-slate-900">📋 Agenda Institucional</h1>
+        <div id="navSessionInfo" class="flex items-center gap-3">
+            <button onclick="abrirModalLogin()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-xl transition">
+                Iniciar Sesión
+            </button>
+        </div>
+    </nav>
 
-        <!-- Navbar Principal -->
-        <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4 no-print">
-            <div class="flex items-center space-x-3">
-                <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
-                <div>
-                    <h1 class="font-extrabold text-slate-900 text-lg tracking-tight">Agenda Institucional Profesional</h1>
-                    <p class="text-xs text-slate-500">Sincronizada con GitHub (data/) — SHA-256 Cifrado</p>
-                </div>
-            </div>
-            <div id="navSessionInfo" class="flex items-center gap-3">
-                <button onclick="abrirModalLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-5 py-3 rounded-xl transition shadow">Iniciar Sesión</button>
-            </div>
-        </nav>
-
-        <!-- Contenedor Principal Dinámico -->
-        <main id="appContainer" class="space-y-6">
-            <div class="bg-white p-16 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4 max-w-xl mx-auto">
-                <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">🔒</div>
-                <h2 class="text-2xl font-extrabold text-slate-900">Acceso Restringido</h2>
-                <p class="text-sm text-slate-500">Inicia sesión con tu cuenta institucional para acceder a tu panel de control, calendario y reportes.</p>
-                <button onclick="abrirModalLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow text-sm w-full">Ingresar al Sistema</button>
-            </div>
-        </main>
-    </div>
+    <!-- Contenedor principal -->
+    <main id="appContainer" class="max-w-6xl mx-auto p-6">
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center">
+            <h2 class="text-2xl font-extrabold text-slate-900">Bienvenido</h2>
+            <p class="text-sm text-slate-500 mt-2">Inicia sesión para acceder al panel según tu rol.</p>
+        </div>
+    </main>
 
     <!-- Modal Login -->
-    <div id="modalLogin" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6">
-            <div class="text-center">
-                <h3 class="text-xl font-extrabold text-slate-900">Iniciar Sesión</h3>
-                <p class="text-xs text-slate-500 mt-1">Usa admin / admin123</p>
+    <div id="modalLogin" class="hidden fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl space-y-4">
+            <h2 class="text-xl font-extrabold text-slate-900">Iniciar Sesión</h2>
+            <div class="space-y-3">
+                <input type="text" id="loginUser" placeholder="Usuario" class="w-full px-4 py-2.5 border rounded-xl text-sm">
+                <input type="password" id="loginPassword" placeholder="Contraseña" class="w-full px-4 py-2.5 border rounded-xl text-sm">
+                <input type="password" id="loginTokenGitHub" placeholder="Token GitHub (solo admin/editor)" class="w-full px-4 py-2.5 border rounded-xl text-sm">
             </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Usuario</label>
-                    <input type="text" id="loginUser" value="admin" maxlength="30" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Contraseña</label>
-                    <input type="password" id="loginPassword" value="admin123" maxlength="50" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (PAT - Solo Admin)</label>
-                    <input type="password" id="loginTokenGitHub" placeholder="ghp_..." maxlength="100" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
-                </div>
-            </div>
-            <div class="flex gap-3 pt-2">
-                <button onclick="cerrarModalLogin()" class="w-1/2 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm">Cancelar</button>
-                <button onclick="procesarLogin()" class="w-1/2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow">Entrar</button>
+            <div class="flex gap-2">
+                <button onclick="cerrarModalLogin()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm transition">Cancelar</button>
+                <button onclick="procesarLogin()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">Entrar</button>
             </div>
         </div>
     </div>
+
+    <!-- Toast -->
+    <div id="toast" class="hidden"></div>
 
     <script src="app.js"></script>
 </body>
