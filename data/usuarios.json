@@ -6,7 +6,8 @@
     "passHash": "d54b3f0b80ef563622907cc5afe8b4ef:725fec9eaae7cda9664ba5fcfbd11ca527affc441e083117996303a6dc40f08b",
     "rol": "admin",
     "area": "Coordinacion",
-    "tokenHash": ""
+    "tokenHash": "",
+    "verTodasAreas": true
   },
   {
     "id": 1792265629177,
