@@ -38,15 +38,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 function mostrarToast(mensaje, tipo = 'success') {
     const toast = document.getElementById('toast');
+    if (!toast) return;
     toast.textContent = mensaje;
     toast.className = `fixed top-5 right-5 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all duration-300 ${tipo === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
     toast.classList.remove('hidden');
     setTimeout(() => toast.classList.add('hidden'), 3500);
 }
 
-// ================= SINCRONIZACIÓN CON GITHUB Y LOCALSTORAGE =================
+// ================= CARGA Y PERSISTENCIA =================
 async function leerArchivoGitHub(ruta) {
-    // Primero revisamos si hay un respaldo local reciente
     const local = localStorage.getItem(`ae_local_${ruta}`);
     if (local) {
         try { return JSON.parse(local); } catch(e){}
@@ -75,41 +75,47 @@ async function cargarDatosDesdeGitHub() {
 }
 
 async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
-    // Guardar siempre de forma local para garantizar fluidez inmediata
+    // Guardar siempre localmente primero para fluidez absoluta
     localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
 
-    const tokenUsar = tokenAdmin || sessionStorage.getItem('ae_github_token');
-    if (!tokenUsar) {
-        mostrarToast('Guardado local exitoso (Sin token activo para sincronizar en la nube).');
-        return true;
-    }
+    // Si es Administrador y tiene token configurado, sincronizamos con GitHub en la nube
+    if (sesionActual?.rol === 'admin' && tokenAdmin) {
+        const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
+        let sha = "";
+        try {
+            const resGet = await fetch(url, { headers: { "Authorization": `token ${tokenAdmin}` } });
+            if (resGet.ok) { const data = await resGet.json(); sha = data.sha; }
+        } catch (e) {}
 
-    const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
-    let sha = "";
-    try {
-        const resGet = await fetch(url, { headers: { "Authorization": `token ${tokenUsar}` } });
-        if (resGet.ok) { const data = await resGet.json(); sha = data.sha; }
-    } catch (e) {}
+        const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
+        const resPut = await fetch(url, {
+            method: "PUT",
+            headers: { "Authorization": `token ${tokenAdmin}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: mensajeCommit, content: contenidoBase64, sha: sha, branch: GITHUB_BRANCH })
+        });
 
-    const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
-    const resPut = await fetch(url, {
-        method: "PUT",
-        headers: { "Authorization": `token ${tokenUsar}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: mensajeCommit, content: contenidoBase64, sha: sha, branch: GITHUB_BRANCH })
-    });
-
-    if (resPut.ok) {
-        mostrarToast('¡Sincronizado con GitHub con éxito!');
-        return true;
+        if (resPut.ok) {
+            mostrarToast('¡Sincronizado con GitHub con éxito!');
+            return true;
+        } else {
+            mostrarToast('Guardado local (Token de Admin rechazado en GitHub).', 'error');
+            return false;
+        }
     } else {
-        mostrarToast('Cambios guardados localmente (Token de GitHub rechazado o sin permisos de repo).', 'error');
-        return false;
+        mostrarToast('Cambios guardados localmente.');
+        return true;
     }
 }
 
-// ================= AUTENTICACIÓN =================
-function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
-function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
+// ================= AUTENTICACIÓN (LOGIN) =================
+function abrirModalLogin() { 
+    // Mostrar u ocultar el campo de token dependiendo si se desea, aquí lo dejamos disponible
+    document.getElementById('modalLogin').classList.remove('hidden'); 
+}
+
+function cerrarModalLogin() { 
+    document.getElementById('modalLogin').classList.add('hidden'); 
+}
 
 function procesarLogin() {
     const user = document.getElementById('loginUser').value.trim();
@@ -117,15 +123,19 @@ function procesarLogin() {
     const token = document.getElementById('loginTokenGitHub').value.trim();
 
     const encontrado = dbUsuarios.find(u => u.usuario === user && u.pass === pass);
+    
     if (encontrado) {
         sesionActual = encontrado;
         sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
-        if (token) {
+
+        // Si es el administrador y proporcionó su token, lo guardamos
+        if (encontrado.rol === 'admin' && token) {
             tokenAdmin = token;
             sessionStorage.setItem('ae_github_token', token);
         }
+
         cerrarModalLogin();
-        mostrarToast(`¡Bienvenido, ${encontrado.nombre} (${encontrado.rol.toUpperCase()})!`);
+        mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
         renderizarInterfazPorRol();
     } else {
         alert('Usuario o contraseña incorrectos.');
@@ -134,11 +144,13 @@ function procesarLogin() {
 
 function cerrarSesion() {
     sessionStorage.removeItem('ae_sesion');
+    sessionStorage.removeItem('ae_github_token');
     sesionActual = null;
+    tokenAdmin = "";
     location.reload();
 }
 
-// ================= RENDERIZADO SEGÚN NIVEL DE USUARIO =================
+// ================= RENDERIZADO POR ROL =================
 function renderizarInterfazPorRol() {
     const navInfo = document.getElementById('navSessionInfo');
     const rolColors = { admin: 'bg-purple-100 text-purple-800', editor: 'bg-blue-100 text-blue-800', visualizador: 'bg-emerald-100 text-emerald-800' };
@@ -162,7 +174,7 @@ function renderizarInterfazPorRol() {
     }
 }
 
-// ================= VISTA VISUALIZADOR (NIVEL 1) =================
+// ================= VISTA VISUALIZADOR =================
 function generarVistaVisualizador() {
     let htmlTareas = dbTareas.map(t => `
         <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -195,7 +207,7 @@ function generarVistaVisualizador() {
     `;
 }
 
-// ================= VISTA EDITOR (NIVEL 2) =================
+// ================= VISTA EDITOR =================
 function generarVistaEditor() {
     let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
     let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
@@ -232,7 +244,7 @@ function generarVistaEditor() {
     `;
 }
 
-// ================= VISTA ADMINISTRADOR (NIVEL 3) =================
+// ================= VISTA ADMINISTRADOR =================
 function generarVistaAdmin() {
     let htmlTareasAdmin = dbTareas.map(t => `
         <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
