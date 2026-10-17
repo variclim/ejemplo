@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Predios Agrícolas con Clima</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        body { margin: 0; padding: 20px; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 1400px; width: 100%; background: white; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 20px; }
+        #map { height: 520px; border-radius: 16px; border: 2px solid #cbd5e1; background: #e9edf2; position: relative; }
+        .toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 12px; align-items: center; }
+        .btn { background: #1e3a5f; color: white; border: none; padding: 8px 18px; border-radius: 40px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .btn:hover { background: #0f2a44; transform: scale(1.02); }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
+        .btn-success { background: #2b6f3b; } .btn-success:hover { background: #1e552b; }
+        .btn-danger { background: #b33c3c; } .btn-danger:hover { background: #8f2a2a; }
+        .btn-warning { background: #d48c2b; } .btn-warning:hover { background: #b3741f; }
+        .btn-purple { background: #6b3fa0; } .btn-purple:hover { background: #552b80; }
+        .btn-teal { background: #1f7a7a; } .btn-teal:hover { background: #166060; }
+        .btn-recover { background: #0d8a7a; } .btn-recover:hover { background: #0a6b5e; }
+        .btn-logout { background: #7a3d0d; } .btn-logout:hover { background: #5a2d0a; }
+        .btn-weather { background: #1a7a8a; } .btn-weather:hover { background: #0f5f6b; }
+        .btn-admin { background: #8e44ad; } .btn-admin:hover { background: #6c3483; }
+        .export-group { margin-left: auto; display: flex; gap: 8px; }
+        .predios-list { margin-top: 20px; background: #f8fafc; border-radius: 16px; padding: 10px 0 5px 0; max-height: 320px; overflow-y: auto; border: 1px solid #dde3ea; }
+        .predio-item { display: grid; grid-template-columns: 75px 95px 95px 105px 75px 105px 115px 65px 50px 115px; gap: 4px; align-items: center; padding: 5px 10px; border-bottom: 1px solid #e4e9f0; font-size: 0.78rem; background: white; transition: background 0.2s; }
+        .predio-item:hover { background: #f1f5f9; }
+        .predio-item.editing { background: #fef9e7; border-left: 4px solid #d48c2b; }
+        .predio-item input, .predio-item select { border: 1px solid #ccd7e6; border-radius: 6px; padding: 2px 6px; font-size: 0.72rem; background: #f8fafc; width: 100%; }
+        .predio-item input:disabled, .predio-item select:disabled { background: #f1f3f5; color: #1e293b; cursor: default; border-color: #e2e8f0; }
+        .predio-item input:not(:disabled), .predio-item select:not(:disabled) { background: white; border-color: #d48c2b; }
+        .header-list { font-weight: 700; background: #e2e8f0; color: #1e293b; border-radius: 12px 12px 0 0; padding: 6px 10px; display: grid; grid-template-columns: 75px 95px 95px 105px 75px 105px 115px 65px 50px 115px; gap: 4px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 5; }
+        .icon-btn { background: none; border: none; cursor: pointer; font-size: 0.95rem; padding: 1px 3px; border-radius: 4px; transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: rgba(0,0,0,0.08); }
+        .icon-btn.delete:hover { color: #b33c3c; background: rgba(179,60,60,0.12); }
+        .icon-btn.edit:hover { color: #d48c2b; background: rgba(212,140,43,0.12); }
+        .icon-btn.zoom:hover { color: #2b6f3b; background: rgba(43,111,59,0.12); }
+        .icon-btn.export-kml:hover { color: #6b3fa0; background: rgba(107,63,160,0.12); }
+        .icon-btn.save-edit:hover { color: #2b6f3b; background: rgba(43,111,59,0.12); }
+        .icon-btn.cancel-edit:hover { color: #b33c3c; background: rgba(179,60,60,0.12); }
+        .icon-btn.weather:hover { color: #1a7a8a; background: rgba(26,122,138,0.12); }
+        .acciones-container { display: flex; gap: 1px; align-items: center; flex-wrap: nowrap; }
+        .acciones-container .icon-btn { font-size: 0.9rem; padding: 1px 2px; }
+        .empty-message { padding: 20px; text-align: center; color: #6b7b8d; font-style: italic; }
+        .popup-field { margin-bottom: 8px; display: flex; align-items: center; }
+        .popup-field label { font-weight: 600; width: 110px; flex-shrink: 0; }
+        .popup-field input, .popup-field select { width: 180px; padding: 4px 8px; border-radius: 8px; border: 1px solid #bcc9db; }
+        .leaflet-popup-content { min-width: 340px; }
+        .btn-sm { padding: 4px 14px; font-size: 0.8rem; border-radius: 30px; }
+        .badge { background: #1e3a5f; color: white; border-radius: 40px; padding: 2px 14px; font-size: 0.8rem; }
+        .badge-save { background: #2b6f3b; }
+        .badge-recover { background: #0d8a7a; cursor: pointer; } .badge-recover:hover { background: #0a6b5e; }
+        .badge-user { background: #6b3fa0; font-size: 0.7rem; }
+        .badge-business { background: #1f7a7a; font-size: 0.7rem; }
+        .badge-weather { background: #1a7a8a; font-size: 0.7rem; }
+        .badge-perfil { background: #6b9e3f; font-size: 0.7rem; }
+        .badge-superficie { background: #1e3a5f; font-size: 0.7rem; cursor: pointer; transition: 0.2s; }
+        .badge-superficie:hover { transform: scale(1.05); }
+        .custom-layer-control { position: absolute; top: 10px; right: 10px; background: white; padding: 6px 10px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; display: flex; gap: 6px; flex-wrap: wrap; }
+        .custom-layer-control button { background: #e9edf2; border: 1px solid #b0c0d0; border-radius: 20px; padding: 4px 14px; font-size: 0.75rem; cursor: pointer; transition: 0.1s; }
+        .custom-layer-control button.active { background: #1e3a5f; color: white; border-color: #1e3a5f; }
+        .custom-layer-control button:hover { opacity: 0.8; }
+        .tile-status { font-size: 0.75rem; color: #475569; background: #eef2f7; padding: 4px 12px; border-radius: 20px; display: inline-flex; align-items: center; gap: 6px; }
+        .tile-status .count { font-weight: 700; color: #1e3a5f; }
+        .file-input-hidden { display: none; }
+        .save-indicator { font-size: 0.7rem; color: #2b6f3b; background: #e6f7e6; padding: 2px 10px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 0.3s ease; }
+        .save-indicator.visible { opacity: 1; }
+        .predio-highlight { background: #dbeafe !important; border-left: 4px solid #1e3a5f; }
+        .superficie-bar-container { margin: 8px 0; padding: 8px 14px; background: #f8fafc; border-radius: 12px; border: 1px solid #dde3ea; display: flex; align-items: center; gap: 12px; font-size: 0.75rem; }
+        .superficie-bar-label { font-weight: 600; color: #1e293b; white-space: nowrap; }
+        .superficie-bar-track { flex: 1; height: 14px; background: #e2e8f0; border-radius: 8px; overflow: hidden; position: relative; min-width: 120px; }
+        .superficie-bar-fill { height: 100%; background: linear-gradient(90deg, #2b6f3b, #4caf50); border-radius: 8px; transition: width 0.4s ease, background 0.3s ease; }
+        .superficie-bar-fill.warning { background: linear-gradient(90deg, #d48c2b, #f1c40f); }
+        .superficie-bar-fill.danger { background: linear-gradient(90deg, #b33c3c, #e74c3c); }
+        .superficie-bar-text { font-weight: 600; color: #1e3a5f; white-space: nowrap; }
+        .weather-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .weather-modal.active { display: flex; }
+        .weather-modal-content { background: white; border-radius: 16px; padding: 20px 24px; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.3); position: relative; }
+        .weather-modal-content .close-btn { position: absolute; top: 10px; right: 16px; font-size: 1.5rem; cursor: pointer; color: #4c6a83; background: none; border: none; transition: 0.2s; }
+        .weather-modal-content .close-btn:hover { color: #1f3b58; transform: rotate(90deg); }
+        .weather-modal-content h3 { color: #1a3a5c; margin-bottom: 12px; font-weight: 500; text-align: center; }
+        .semaphore { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin: 0 1px; vertical-align: middle; }
+        .semaphore-green { background: #2ecc71; } .semaphore-yellow { background: #f1c40f; } .semaphore-red { background: #e74c3c; } .semaphore-gray { background: #95a5a6; }
+        .status-badge { padding: 1px 8px; border-radius: 16px; font-size: 0.65rem; font-weight: 600; display: inline-block; }
+        .status-green { background: #d5f5e3; color: #1a7a42; }
+        .status-yellow { background: #fdebd0; color: #a04000; }
+        .status-red { background: #fadbd8; color: #922b21; }
+        .status-gray { background: #e8e8e8; color: #5d6d7e; }
+        .weather-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; margin-top: 8px; }
+        .weather-item { background: #f5f9ff; border-radius: 4px; padding: 4px 6px; text-align: center; border: 1px solid #e2e8f0; font-size: 0.6rem; }
+        .weather-item .fecha { font-weight: 600; font-size: 0.6rem; color: #1f3b58; border-bottom: 1px solid #e2e8f0; padding-bottom: 2px; margin-bottom: 2px; }
+        .weather-item .fila { display: flex; align-items: center; justify-content: space-between; padding: 1px 2px; gap: 2px; }
+        .weather-item .fila .etq { color: #4c6a83; font-size: 0.5rem; font-weight: 600; min-width: 18px; text-align: left; }
+        .weather-item .fila .val { display: flex; gap: 2px; align-items: center; }
+        .weather-item .semaphore { width: 10px; height: 10px; margin: 0; flex-shrink: 0; }
+        .weather-item .fila .val-text { font-size: 0.5rem; color: #1f3b58; font-weight: 500; }
+        .weather-item .fila-temp { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 0.5rem; color: #4c6a83; }
+        .weather-legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 0.6rem; margin-top: 6px; padding-top: 6px; border-top: 1px solid #e2e8f0; }
+        .weather-legend .item { display: flex; align-items: center; gap: 3px; }
+        .weather-legend .semaphore { width: 10px; height: 10px; }
+        .chart-container { position: relative; height: 250px; margin-top: 10px; }
+        .chart-legend-custom { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 8px; font-size: 0.7rem; }
+        .chart-legend-custom span { display: flex; align-items: center; gap: 5px; }
+        .chart-legend-custom .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .weather-current { background: #f5f9ff; border-radius: 8px; padding: 10px 14px; margin: 8px 0 12px 0; border-left: 4px solid #1a7a8a; font-size: 0.8rem; }
+        .weather-current p { margin: 2px 0; }
+        .historical-table-wrapper { overflow-x: auto; max-height: 250px; overflow-y: auto; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 8px; }
+        .historical-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; min-width: 650px; }
+        .historical-table th { background: #1f3b58; color: white; padding: 4px 5px; text-align: center; position: sticky; top: 0; z-index: 10; font-weight: 500; white-space: nowrap; font-size: 0.6rem; }
+        .historical-table td { padding: 4px 4px; text-align: center; border-bottom: 1px solid #e2e8f0; white-space: nowrap; font-size: 0.65rem; }
+        .historical-table tr:hover td { background: #f7fafc; }
+        .weather-modal-tabs { display: flex; gap: 8px; margin: 8px 0 4px 0; flex-wrap: wrap; }
+        .weather-modal-tabs button { padding: 4px 16px; border-radius: 20px; border: 1px solid #bcccdb; background: white; font-size: 0.75rem; cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .weather-modal-tabs button:hover { background: #e8edf5; }
+        .weather-modal-tabs button.active { background: #1a7a8a; color: white; border-color: #1a7a8a; }
+        .weather-tab-content { display: none; } .weather-tab-content.active { display: block; }
+        .precip-info { font-size: 0.65rem; color: #4c6a83; margin-top: 4px; text-align: center; }
+        .historical-status-legend { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; font-size: 0.6rem; margin: 6px 0; }
+        .historical-status-legend .item { display: flex; align-items: center; gap: 3px; }
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(8px); padding: 20px; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: white; border-radius: 16px; border: 2px solid #1e3a5f; max-width: 480px; width: 100%; padding: 30px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); max-height: 90vh; overflow-y: auto; }
+        .modal-box .modal-header { text-align: center; margin-bottom: 20px; }
+        .modal-box .modal-header h2 { color: #1e3a5f; font-size: 1.5rem; margin: 0; }
+        .modal-box .modal-header p { color: #6b7b8d; font-size: 0.9rem; margin: 4px 0 0 0; }
+        .modal-box .form-group { margin-bottom: 14px; }
+        .modal-box .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: #1e293b; margin-bottom: 4px; }
+        .modal-box .form-group input, .modal-box .form-group select { width: 100%; padding: 8px 12px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 8px; color: #1e293b; font-size: 0.95rem; transition: all 0.2s; }
+        .modal-box .form-group input:focus, .modal-box .form-group select:focus { outline: none; border-color: #1e3a5f; box-shadow: 0 0 0 3px rgba(30,58,95,0.1); }
+        .modal-box .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+        .modal-box .form-actions button { padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.2s; flex: 1; min-width: 100px; }
+        .modal-box .form-actions button.primary { background: #1e3a5f; color: white; }
+        .modal-box .form-actions button.primary:hover { background: #0f2a44; }
+        .modal-box .form-actions button.success { background: #2b6f3b; color: white; }
+        .modal-box .form-actions button.success:hover { background: #1e552b; }
+        .modal-box .form-actions button.danger { background: #b33c3c; color: white; }
+        .modal-box .form-actions button.danger:hover { background: #8f2a2a; }
+        .modal-box .form-error { color: #b33c3c; font-size: 0.85rem; margin-top: 8px; text-align: center; display: none; }
+        .modal-box .form-error.show { display: block; }
+        .modal-box .form-success { color: #2b6f3b; font-size: 0.85rem; margin-top: 8px; text-align: center; display: none; }
+        .modal-box .form-success.show { display: block; }
+        .modal-box .form-hint { font-size: 0.75rem; color: #6b7b8d; margin-top: 4px; }
+        .admin-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(6px); padding: 20px; }
+        .admin-modal.active { display: flex; }
+        .admin-content { background: white; border-radius: 16px; padding: 24px; max-width: 1200px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative; border: 2px solid #6b3fa0; }
+        .admin-content h2 { color: #6b3fa0; margin: 0 0 6px 0; font-size: 1.4rem; display: flex; align-items: center; gap: 8px; }
+        .admin-content .admin-sub { color: #6b7b8d; font-size: 0.85rem; margin-bottom: 16px; }
+        .admin-content .close-btn { position: absolute; top: 12px; right: 16px; font-size: 1.5rem; cursor: pointer; color: #4c6a83; background: none; border: none; transition: 0.2s; }
+        .admin-content .close-btn:hover { color: #1f3b58; transform: rotate(90deg); }
+        .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 18px; }
+        .admin-stat-card { background: linear-gradient(135deg, #f8fafc, #eef2f7); border: 1px solid #dde3ea; border-radius: 12px; padding: 12px 16px; border-left: 4px solid #6b3fa0; }
+        .admin-stat-card .label { font-size: 0.7rem; color: #6b7b8d; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .admin-stat-card .value { font-size: 1.3rem; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .admin-stat-card .sub { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+        .admin-table-wrapper { overflow-x: auto; border-radius: 12px; border: 1px solid #dde3ea; max-height: 400px; overflow-y: auto; }
+        .admin-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 900px; }
+        .admin-table th { background: #6b3fa0; color: white; padding: 8px 10px; text-align: left; position: sticky; top: 0; z-index: 5; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .admin-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+        .admin-table tr:hover td { background: #f8fafc; }
+        .admin-actions-cell { display: flex; gap: 6px; flex-wrap: nowrap; }
+        .admin-actions-cell button { border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; transition: 0.2s; display: inline-flex; align-items: center; gap: 3px; }
+        .admin-btn-edit { background: #d48c2b; color: white; } .admin-btn-edit:hover { background: #b3741f; }
+        .admin-btn-delete { background: #b33c3c; color: white; } .admin-btn-delete:hover { background: #8f2a2a; }
+        .admin-btn-view { background: #1a7a8a; color: white; } .admin-btn-view:hover { background: #0f5f6b; }
+        .admin-btn-token { background: #2b6f3b; color: white; } .admin-btn-token:hover { background: #1e552b; }
+        .badge-rol { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .rol-admin { background: #6b3fa0; color: white; }
+        .rol-editor { background: #1e6fb8; color: white; }
+        .rol-visualizador { background: #2b6f3b; color: white; }
+        .permiso-tag { display: inline-block; padding: 1px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 600; margin: 1px; }
+        .permiso-on { background: #d5f5e3; color: #1a7a42; }
+        .permiso-off { background: #f1f3f5; color: #94a3b8; }
+        @media (max-width: 900px) {
+            .predio-item, .header-list { grid-template-columns: 55px 65px 65px 75px 55px 75px 85px 45px 35px 80px; font-size: 0.6rem; gap: 2px; padding: 3px 6px; }
+            .predio-item input, .predio-item select { font-size: 0.6rem; padding: 1px 3px; }
+            .icon-btn { font-size: 0.75rem; padding: 1px 2px; }
+            .acciones-container .icon-btn { font-size: 0.75rem; }
+            .modal-box { padding: 20px 16px; max-width: 95%; }
+            .modal-box .modal-header h2 { font-size: 1.2rem; }
+            .custom-layer-control { top: 10px; right: 10px; padding: 4px 8px; gap: 4px; }
+            .custom-layer-control button { font-size: 0.65rem; padding: 3px 10px; }
+            .weather-modal-content { padding: 16px; }
+            .weather-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+            .historical-table { font-size: 0.6rem; min-width: 550px; }
+            .historical-table th { font-size: 0.55rem; }
+            .historical-table td { font-size: 0.55rem; }
+            .admin-content { padding: 16px; }
+        }
+        @media (max-width: 600px) {
+            .toolbar .btn { padding: 4px 8px; font-size: 0.65rem; }
+            .export-group { margin-left: 0; }
+            .predio-item, .header-list { grid-template-columns: 40px 50px 50px 60px 40px 60px 65px 35px 30px 60px; font-size: 0.5rem; gap: 1px; padding: 2px 4px; }
+            .icon-btn { font-size: 0.65rem; padding: 0px 1px; }
+            .acciones-container .icon-btn { font-size: 0.65rem; }
+            .modal-box .form-actions button { font-size: 0.8rem; padding: 6px 12px; min-width: 70px; }
+            .custom-layer-control { top: 5px; right: 5px; padding: 3px 5px; gap: 3px; }
+            .custom-layer-control button { font-size: 0.55rem; padding: 2px 6px; }
+            .weather-grid { grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); }
+            .historical-table { font-size: 0.5rem; min-width: 450px; }
+            .superficie-bar-container { flex-direction: column; align-items: stretch; gap: 6px; }
+            .superficie-bar-label, .superficie-bar-text { text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- MODAL LOGIN -->
+<div class="modal-overlay active" id="loginModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2>🌾 Registro de Predios</h2>
+            <p>Inicia sesión con tus credenciales</p>
+        </div>
+        <div class="form-group">
+            <label>👤 Usuario</label>
+            <input type="text" id="loginUser" placeholder="Ej. admin" autocomplete="username" />
+        </div>
+        <div class="form-group">
+            <label>🔑 Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div class="form-error" id="loginError">⚠️ Usuario o contraseña incorrectos</div>
+        <div class="form-actions">
+            <button class="primary" id="loginBtn">🚀 Iniciar Sesión</button>
+        </div>
+        <div style="text-align:center; margin-top:18px; padding-top:14px; border-top:1px solid #e2e8f0;">
+            <button class="btn btn-admin" id="openAdminBtn" style="font-size:0.8rem; padding:6px 20px;">
+                🔐 Panel Administrador
+            </button>
+        </div>
+        <div style="text-align:center; margin-top:8px; font-size:0.7rem; color:#94a3b8;">
+            v4.0 — Autenticación PBKDF2 + GitHub
+        </div>
+    </div>
+</div>
+
+<!-- MODAL LOGIN ADMIN (token) -->
+<div class="modal-overlay" id="adminLoginModal">
+    <div class="modal-box" style="border-color:#6b3fa0; max-width:400px;">
+        <div class="modal-header">
+            <h2 style="color:#6b3fa0;">🔐 Panel de Administración</h2>
+            <p>Ingresa las credenciales de administrador</p>
+        </div>
+        <div class="form-group">
+            <label>👤 Usuario Administrador</label>
+            <input type="text" id="adminUserInput" placeholder="Usuario admin" autocomplete="off" />
+        </div>
+        <div class="form-group">
+            <label>🔑 Contraseña</label>
+            <input type="password" id="adminPassInput" placeholder="Contraseña" autocomplete="off" />
+        </div>
+        <div class="form-error" id="adminLoginError">⚠️ Credenciales incorrectas</div>
+        <div class="form-actions">
+            <button class="primary" id="adminLoginCancel" style="background:#8b9bb0;">Cancelar</button>
+            <button class="primary" id="adminLoginSubmit" style="background:#6b3fa0;">🔓 Entrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- PANEL ADMINISTRADOR -->
+<div class="admin-modal" id="adminPanelModal">
+    <div class="admin-content">
+        <button class="close-btn" id="adminPanelClose">&times;</button>
+        <h2>🔐 Panel de Administración</h2>
+        <div class="admin-sub">Gestiona usuarios, roles, permisos y el token de GitHub</div>
+        <div class="admin-stats" id="adminStats"></div>
+
+        <!-- Token GitHub -->
+        <div class="admin-config-box" style="background:#f8fafc; border-radius:12px; padding:14px 18px; margin-bottom:18px; border:1px solid #dde3ea;">
+            <h4>🔑 Token de GitHub</h4>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input type="password" id="adminTokenInput" placeholder="ghp_..." style="flex:1; min-width:200px; padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem;" />
+                <button class="btn btn-success" id="adminSaveToken" style="padding:6px 16px; font-size:0.8rem;">💾 Guardar Token</button>
+                <button class="btn btn-danger" id="adminDeleteToken" style="padding:6px 16px; font-size:0.8rem;">🗑️ Borrar</button>
+            </div>
+            <div class="form-hint" id="adminTokenStatus" style="margin-top:6px;">Sin token configurado</div>
+        </div>
+
+        <!-- Crear usuario -->
+        <div style="background:#f8fafc; border-radius:12px; padding:14px 18px; margin-bottom:18px; border:1px solid #dde3ea;">
+            <h4>➕ Crear Nuevo Usuario</h4>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-top:8px;">
+                <input type="text" id="adminNewNombre" placeholder="Nombre completo" style="padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem;" />
+                <input type="text" id="adminNewUsuario" placeholder="Usuario (login)" style="padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem;" />
+                <input type="password" id="adminNewPass" placeholder="Contraseña (mín. 8)" style="padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem;" />
+                <select id="adminNewRol" style="padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem; background:white;">
+                    <option value="visualizador">Visualizador</option>
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                </select>
+                <input type="text" id="adminNewArea" placeholder="Área (ej. Agricola)" value="Agricola" style="padding:6px 10px; border-radius:8px; border:2px solid #e2e8f0; font-size:0.85rem;" />
+            </div>
+            <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap;">
+                <label style="font-size:0.8rem;"><input type="checkbox" id="adminNewVerTodas" /> 👁️ Ver todas las áreas</label>
+                <label style="font-size:0.8rem;"><input type="checkbox" id="adminNewAsignarCualquier" /> ✏️ Crear predios en cualquier área</label>
+            </div>
+            <button class="btn btn-success" id="adminCreateUser" style="margin-top:10px; padding:6px 16px; font-size:0.8rem;">➕ Crear Usuario</button>
+        </div>
+
+        <!-- Tabla de usuarios -->
+        <div class="admin-table-wrapper">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Área</th>
+                        <th>Permisos</th>
+                        <th>Predios</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminUsersTableBody">
+                    <tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">Cargando usuarios...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR USUARIO (desde admin) -->
+<div class="modal-overlay" id="adminEditUserModal">
+    <div class="modal-box" style="border-color:#d48c2b; max-width:450px;">
+        <div class="modal-header">
+            <h2 style="color:#d48c2b;">✏️ Editar Usuario</h2>
+            <p id="adminEditUserSub">Modifica los datos del usuario</p>
+        </div>
+        <input type="hidden" id="adminEditUserId" />
+        <div class="form-group">
+            <label>👤 Nombre completo</label>
+            <input type="text" id="adminEditUserName" />
+        </div>
+        <div class="form-group">
+            <label>🔑 Usuario (login)</label>
+            <input type="text" id="adminEditUserUsuario" />
+        </div>
+        <div class="form-group">
+            <label>🎯 Rol</label>
+            <select id="adminEditUserRol">
+                <option value="visualizador">Visualizador</option>
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>🏢 Área</label>
+            <input type="text" id="adminEditUserArea" />
+        </div>
+        <div style="display:flex; gap:16px; margin-top:8px; flex-wrap:wrap;">
+            <label style="font-size:0.8rem;"><input type="checkbox" id="adminEditVerTodas" /> 👁️ Ver todas las áreas</label>
+            <label style="font-size:0.8rem;"><input type="checkbox" id="adminEditAsignarCualquier" /> ✏️ Crear predios en cualquier área</label>
+        </div>
+        <div class="form-error" id="adminEditUserError">⚠️ Completa todos los campos</div>
+        <div class="form-actions">
+            <button class="primary" id="adminEditCancel" style="background:#8b9bb0;">Cancelar</button>
+            <button class="success" id="adminEditSave" style="background:#d48c2b;">💾 Guardar Cambios</button>
+        </div>
+    </div>
+</div>
+
+<!-- CONTENIDO PRINCIPAL -->
+<div class="container" id="mainContent" style="display:none;">
+    <h2 style="margin: 0 0 8px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <span>🌾 Registro de Predios</span>
+        <span class="badge badge-user" id="userBadge">👤 Usuario</span>
+        <span class="badge badge-business" id="businessBadge">🏢 Área</span>
+        <span class="badge badge-perfil" id="perfilBadge">🎯 Rol</span>
+        <span class="badge" id="contador">0</span>
+        <span class="badge badge-save" id="saveIndicator" style="font-size:0.65rem; padding:2px 10px;">💾 Guardado</span>
+        <span class="badge badge-recover" id="recoverBtn" style="font-size:0.65rem; padding:2px 10px; cursor:pointer;">🔄 Recuperar</span>
+        <button class="btn btn-logout" id="logoutBtn" style="font-size:0.65rem; padding:2px 12px; margin-left:4px;">🚪 Salir</button>
+        <span class="tile-status" id="tileStatus" style="display:none;">🗺️ Tiles: <span class="count" id="tileCount">0</span></span>
+    </h2>
+    <div class="superficie-bar-container" id="superficieBarContainer">
+        <span class="superficie-bar-label">📐 Predios:</span>
+        <div class="superficie-bar-track"><div class="superficie-bar-fill" id="superficieBarFill" style="width: 0%;"></div></div>
+        <span class="superficie-bar-text" id="superficieBarText">0 predios</span>
+    </div>
+    <div id="map">
+        <div class="custom-layer-control" id="layerControl">
+            <button class="active" data-layer="osm">🌍 OSM</button>
+            <button data-layer="hybrid">🛰️ Hybrid</button>
+            <button data-layer="esri">🗺️ ESRI</button>
+        </div>
+    </div>
+    <div class="toolbar">
+        <button class="btn" id="drawPolygonBtn">➕ Dibujar polígono</button>
+        <button class="btn btn-danger" id="clearAllBtn">🗑️ Limpiar todos</button>
+        <button class="btn btn-purple" id="loadTilesBtn">📦 Cargar Tiles (ZIP)</button>
+        <input type="file" id="zipInput" class="file-input-hidden" accept=".zip" />
+        <button class="btn btn-warning" id="clearTilesBtn">🗑️ Limpiar Tiles</button>
+        <div class="export-group">
+            <button class="btn btn-success" id="exportKmlBtn">📁 KML</button>
+            <button class="btn btn-success" id="exportCsvBtn">📊 CSV</button>
+        </div>
+    </div>
+    <div style="font-weight: 500; margin: 12px 0 4px;">📋 Lista de predios</div>
+    <div class="predios-list" id="prediosListContainer">
+        <div class="header-list">
+            <span>ID</span><span>Nombre</span><span>Cultivo</span><span>Fecha Siembra</span><span>Estado</span>
+            <span>Municipio</span><span>Propietario</span><span>Superficie</span><span></span><span>Acciones</span>
+        </div>
+        <div id="prediosList" class="empty-message">No hay predios registrados. Dibuja un polígono.</div>
+    </div>
+</div>
+
+<!-- Modal de Clima -->
+<div class="weather-modal" id="weatherModal">
+    <div class="weather-modal-content">
+        <button class="close-btn" id="weatherModalClose">&times;</button>
+        <h3 id="weatherModalTitle">🌤️ Clima del Predio</h3>
+        <div class="weather-modal-tabs">
+            <button class="active" data-tab="actual">🌡️ Actual</button>
+            <button data-tab="pronostico">📊 Pronóstico</button>
+            <button data-tab="historico">📈 Histórico</button>
+        </div>
+        <div id="weatherContent">
+            <div class="weather-tab-content active" id="tab-actual">
+                <div class="weather-current" id="weatherCurrent"><p><i class="fas fa-spinner fa-spin"></i> Cargando clima actual...</p></div>
+            </div>
+            <div class="weather-tab-content" id="tab-pronostico">
+                <div id="weatherForecast"><p style="text-align:center;font-size:0.7rem;color:#4c6a83;"><i class="fas fa-spinner fa-spin"></i> Cargando pronóstico...</p></div>
+                <div class="chart-container"><canvas id="weatherChart"></canvas></div>
+                <div class="chart-legend-custom">
+                    <span><span class="dot" style="background:#3498db;"></span> T. Máxima (°C)</span>
+                    <span><span class="dot" style="background:#e67e22;"></span> T. Mínima (°C)</span>
+                    <span><span class="dot" style="background:#2ecc71;"></span> Precipitación (mm)</span>
+                </div>
+                <div class="weather-legend">
+                    <span class="item"><span class="semaphore semaphore-green"></span> Óptimo</span>
+                    <span class="item"><span class="semaphore semaphore-yellow"></span> Precaución</span>
+                    <span class="item"><span class="semaphore semaphore-red"></span> Alerta</span>
+                    <span class="item"><span class="semaphore semaphore-gray"></span> N/A</span>
+                </div>
+            </div>
+            <div class="weather-tab-content" id="tab-historico">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+                    <span style="font-size:0.75rem;color:#4c6a83;" id="histPeriodInfo">Selecciona un predio</span>
+                    <button class="btn btn-sm btn-weather" id="loadHistoricalBtn" style="padding:2px 14px;font-size:0.7rem;">
+                        <i class="fas fa-sync-alt"></i> Cargar Histórico
+                    </button>
+                </div>
+                <div class="historical-table-wrapper">
+                    <table class="historical-table" id="historicalTable">
+                        <thead><tr><th>Sem</th><th>Fecha</th><th>T.Max</th><th>T.Min</th><th>Precip</th><th>T.Max</th><th>T.Min</th><th>Precip</th><th>Taponamiento</th><th>Acame</th><th>Índice Agua</th></tr></thead>
+                        <tbody id="histTableBody"><tr><td colspan="11" style="text-align:center;padding:20px;color:#7f8c8d;font-size:0.75rem;">Carga el histórico usando la fecha de siembra del predio</td></tr></tbody>
+                    </table>
+                </div>
+                <div class="historical-status-legend">
+                    <span class="item"><span class="semaphore semaphore-green"></span> Óptimo</span>
+                    <span class="item"><span class="semaphore semaphore-yellow"></span> Precaución</span>
+                    <span class="item"><span class="semaphore semaphore-red"></span> Alerta</span>
+                    <span class="item"><span class="semaphore semaphore-gray"></span> N/A</span>
+                    <span class="item"><span class="status-badge status-green">Normal</span> Normal</span>
+                    <span class="item"><span class="status-badge status-red">Sequía</span> Sequía</span>
+                    <span class="item"><span class="status-badge status-red">Inundación</span> Inundación</span>
+                </div>
+                <div class="precip-info" id="precipInfoHist">📊 Rangos de precipitación por semana del cultivo</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ============================================================
+    // CONFIG GITHUB
+    // ============================================================
+    const GITHUB_USER = "variclim";
+    const GITHUB_REPO = "ejemplo";
+    const GITHUB_BRANCH = "main";
+
+    // ============================================================
+    // HASH PBKDF2
+    // ============================================================
+    const PBKDF2_ITERATIONS = 310000;
+    const PBKDF2_KEYLEN = 32;
+
+    function bufferToHex(buffer) {
+        return Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    function hexToBuffer(hex) {
+        const b = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < b.length; i++) b[i] = parseInt(hex.substr(i * 2, 2), 16);
+        return b.buffer;
+    }
+    async function generarHashPassword(p) {
+        const enc = new TextEncoder();
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const km = await crypto.subtle.importKey("raw", enc.encode(p), { name: "PBKDF2" }, false, ["deriveBits"]);
+        const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, km, PBKDF2_KEYLEN * 8);
+        return bufferToHex(salt) + ":" + bufferToHex(bits);
+    }
+    async function verificarPassword(p, almacenado) {
+        if (!almacenado || !almacenado.includes(":")) return p === almacenado;
+        const [saltHex, hashHex] = almacenado.split(":");
+        const enc = new TextEncoder();
+        const km = await crypto.subtle.importKey("raw", enc.encode(p), { name: "PBKDF2" }, false, ["deriveBits"]);
+        const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: hexToBuffer(saltHex), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" }, km, PBKDF2_KEYLEN * 8);
+        return bufferToHex(bits) === hashHex;
+    }
+
+    // ============================================================
+    // ESTADO GLOBAL
+    // ============================================================
+    let tokenAdmin = sessionStorage.getItem('ae_github_token') || "";
+    let sesionActual = null;
+    let dbUsuarios = [];
+    let dbPredios = [];
+    let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: [] };
+
+    let map = null, drawnItems = null, drawControl = null;
+    let currentPolygon = null, polygonCoords = null;
+    let contadorId = 1, editingId = null;
+    let mapaInicializado = false, mapaInicializando = false;
+    let chartInstance = null;
+    let tileLayers = {}, tileCount = 0, tileBounds = null;
+    let osmLayer = null, hybridLayer = null, esriLayer = null;
+    let currentWeatherData = null, currentForecastData = null, currentPredioId = null, historicalDays = null;
+
+    // ============================================================
+    // CLIMA - CONSTANTES
+    // ============================================================
+    const API_KEY = 'W8DA7F4LDPDBT5QHQS95M8ZJZ';
+    const BASE_URL = 'https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline';
+
+    const PRECIP_RANGES = {
+        1: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        2: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        3: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        4: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        5: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        6: { min: 10.3, opt: 16, minReal: 8.1, prec: 12.8, inundPrec: 38.9, inundPot: 58.3, sequia: 5.69 },
+        7: { min: 10.3, opt: 16, minReal: 8.1, prec: 12.8, inundPrec: 38.9, inundPot: 58.3, sequia: 5.69 },
+        8: { min: 25.7, opt: 40, minReal: 20.3, prec: 32, inundPrec: 97.2, inundPot: 145.7, sequia: 14.22 },
+        9: { min: 30.9, opt: 48, minReal: 24.4, prec: 38.4, inundPrec: 116.6, inundPot: 174.9, sequia: 17.07 },
+        10: { min: 20.6, opt: 32, minReal: 16.3, prec: 25.6, inundPrec: 77.7, inundPot: 116.6, sequia: 11.38 },
+        11: { min: 25.7, opt: 40, minReal: 20.3, prec: 32, inundPrec: 97.2, inundPot: 145.7, sequia: 14.22 },
+        12: { min: 20.6, opt: 32, minReal: 16.3, prec: 25.6, inundPrec: 77.7, inundPot: 116.6, sequia: 11.38 },
+        13: { min: 20.6, opt: 32, minReal: 16.3, prec: 25.6, inundPrec: 77.7, inundPot: 116.6, sequia: 11.38 },
+        14: { min: 36.0, opt: 56, minReal: 28.4, prec: 44.8, inundPrec: 136.0, inundPot: 204.0, sequia: 19.91 },
+        15: { min: 51.4, opt: 80, minReal: 40.6, prec: 64, inundPrec: 194.3, inundPot: 291.5, sequia: 28.44 },
+        16: { min: 51.4, opt: 80, minReal: 40.6, prec: 64, inundPrec: 194.3, inundPot: 291.5, sequia: 28.44 },
+        17: { min: 43.7, opt: 68, minReal: 34.5, prec: 54.4, inundPrec: 165.2, inundPot: 247.7, sequia: 24.18 },
+        18: { min: 30.9, opt: 48, minReal: 24.4, prec: 38.4, inundPrec: 116.6, inundPot: 174.9, sequia: 17.07 },
+        19: { min: 25.7, opt: 40, minReal: 20.3, prec: 32, inundPrec: 97.2, inundPot: 145.7, sequia: 14.22 },
+        20: { min: 23.1, opt: 36, minReal: 18.3, prec: 28.8, inundPrec: 87.4, inundPot: 131.2, sequia: 12.80 },
+        21: { min: 20.6, opt: 32, minReal: 16.3, prec: 25.6, inundPrec: 77.7, inundPot: 116.6, sequia: 11.38 },
+        22: { min: 18.0, opt: 28, minReal: 14.2, prec: 22.4, inundPrec: 68.0, inundPot: 102.0, sequia: 9.95 },
+        23: { min: 10.3, opt: 16, minReal: 8.1, prec: 12.8, inundPrec: 38.9, inundPot: 58.3, sequia: 5.69 },
+        24: { min: 10.3, opt: 16, minReal: 8.1, prec: 12.8, inundPrec: 38.9, inundPot: 58.3, sequia: 5.69 },
+        25: { min: 5.1, opt: 8, minReal: 4.1, prec: 6.4, inundPrec: 19.4, inundPot: 29.1, sequia: 2.84 },
+        26: { min: 2.6, opt: 4, minReal: 2.0, prec: 3.2, inundPrec: 9.7, inundPot: 14.6, sequia: 1.42 }
+    };
+
+    function getTempMaxStatus(t) { if (t < 33) return { class: 'semaphore-green', text: 'Óptimo' }; if (t <= 35) return { class: 'semaphore-yellow', text: 'Precaución' }; return { class: 'semaphore-red', text: 'Alerta' }; }
+    function getTempMinStatus(t) { if (t > 8) return { class: 'semaphore-green', text: 'Óptimo' }; if (t >= 4) return { class: 'semaphore-yellow', text: 'Precaución' }; return { class: 'semaphore-red', text: 'Alerta' }; }
+    function getPrecipStatus(p, w) {
+        const r = PRECIP_RANGES[w]; if (!r) return { class: 'semaphore-gray', text: 'N/A' };
+        if (p <= 0) { if (r.minReal > 0) return { class: 'semaphore-red', text: 'Alerta' }; return { class: 'semaphore-yellow', text: 'Precaución' }; }
+        if (p < r.minReal) return { class: 'semaphore-red', text: 'Alerta' };
+        if (p < r.min) return { class: 'semaphore-yellow', text: 'Precaución' };
+        if (p <= r.opt) return { class: 'semaphore-green', text: 'Óptimo' };
+        if (p <= r.prec) return { class: 'semaphore-yellow', text: 'Precaución' };
+        return { class: 'semaphore-red', text: 'Alerta' };
+    }
+    function getAcame(t) { if (t >= 40) return { text: 'Alerta', class: 'semaphore-red' }; if (t <= 15) return { text: 'Normal', class: 'semaphore-green' }; return { text: 'Precaución', class: 'semaphore-yellow' }; }
+    function getIndiceAgua(p, w) {
+        const r = PRECIP_RANGES[w]; if (!r) return { text: 'N/A', class: 'semaphore-gray' };
+        if (p <= 0 || p <= r.sequia) return { text: 'Sequía', class: 'semaphore-red' };
+        if (p >= r.inundPot) return { text: 'Inundación', class: 'semaphore-red' };
+        if (p >= r.min && p <= r.opt) return { text: 'Normal', class: 'semaphore-green' };
+        if (p >= r.minReal && p < r.min) return { text: 'Precaución', class: 'semaphore-yellow' };
+        if (p > r.opt && p < r.inundPrec) return { text: 'Precaución', class: 'semaphore-yellow' };
+        return { text: 'Precaución', class: 'semaphore-yellow' };
+    }
+    function getTaponamiento(arr, w) {
+        if (w > 5) return { text: 'N/A', class: 'status-gray' };
+        const last7 = arr.slice(-7);
+        const c15 = last7.filter(p => p >= 15).length;
+        const c10 = last7.filter(p => p >= 10).length;
+        const total = arr.reduce((a, b) => a + b, 0);
+        if (total <= 5) return { text: 'NO', class: 'status-green' };
+        if (c15 >= 3) return { text: 'Alerta', class: 'status-red' };
+        if (c10 >= 2) return { text: 'Probable', class: 'status-yellow' };
+        return { text: 'NO', class: 'status-green' };
+    }
+
+    // ============================================================
+    // CLIMA - API
+    // ============================================================
+    async function fetchCurrentWeather(lat, lng) {
+        const url = `${BASE_URL}/${lat},${lng}/today?unitGroup=metric&key=${API_KEY}&contentType=json`;
+        const resp = await fetch(url); if (!resp.ok) throw new Error(`API Error (${resp.status})`);
+        const data = await resp.json();
+        if (data.days && data.days.length > 0) {
+            const d = data.days[0];
+            return { temp: d.temp, feelslike: d.feelslike, humidity: d.humidity, precip: d.precip || 0, windspeed: d.windspeed, conditions: d.conditions || 'N/A', description: d.description || 'Sin descripción', date: d.datetime || new Date().toISOString().split('T')[0], tempmin: d.tempmin || d.temp - 5, tempmax: d.tempmax || d.temp + 5 };
+        }
+        throw new Error('No hay datos para hoy');
+    }
+    async function fetchForecast(lat, lng, days) {
+        const url = `${BASE_URL}/${lat},${lng}/next${days}days?unitGroup=metric&key=${API_KEY}&contentType=json`;
+        const resp = await fetch(url); if (!resp.ok) throw new Error(`API Pronóstico Error (${resp.status})`);
+        const data = await resp.json();
+        if (data.days && data.days.length > 0) return data.days;
+        throw new Error('Sin datos de pronóstico');
+    }
+    async function fetchWeeklyHistorical(lat, lng, startDate, durationMonths) {
+        const start = new Date(startDate);
+        const end = new Date(start); end.setMonth(end.getMonth() + durationMonths); end.setDate(end.getDate() - 1);
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const endDate = new Date(endStr);
+        let finalEndStr = endStr;
+        if (endDate > today) finalEndStr = today.toISOString().split('T')[0];
+        const url = `${BASE_URL}/${lat},${lng}/${startStr}/${finalEndStr}?unitGroup=metric&key=${API_KEY}&contentType=json`;
+        const resp = await fetch(url); if (!resp.ok) throw new Error(`API Histórico Error (${resp.status})`);
+        const data = await resp.json();
+        if (data.days && data.days.length > 0) return data.days;
+        throw new Error('Sin datos en el rango');
+    }
+    function groupByWeeks(days) {
+        const weeks = []; let cw = [];
+        days.forEach((d, i) => { cw.push(d); if (cw.length === 7 || i === days.length - 1) { weeks.push(cw); cw = []; } });
+        return weeks;
+    }
+    function formatDate(s) { return new Date(s).toLocaleDateString('es-ES'); }
+    function formatDateShort(s) { return new Date(s).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }); }
+
+    function buildHistoricalTable(days, startDate, predioNombre, duracionMeses) {
+        const tbody = document.getElementById('histTableBody');
+        const periodInfo = document.getElementById('histPeriodInfo');
+        if (!days || days.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#7f8c8d;font-size:0.75rem;">No hay datos disponibles</td></tr>';
+            periodInfo.textContent = predioNombre || 'Sin datos'; return;
+        }
+        const start = new Date(startDate);
+        const end = new Date(start); end.setMonth(end.getMonth() + duracionMeses);
+        const endStr = end.toISOString().split('T')[0];
+        const filteredDays = days.filter(d => d.datetime <= endStr);
+        if (filteredDays.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#7f8c8d;font-size:0.75rem;">No hay datos para la duración seleccionada</td></tr>';
+            periodInfo.textContent = predioNombre || 'Sin datos'; return;
+        }
+        const weeks = groupByWeeks(filteredDays);
+        let html = ''; let globalPrecip = [];
+        weeks.forEach((week, idx) => {
+            const weekNum = idx + 1; const weekIdx = weekNum;
+            const avgTempMax = week.reduce((s, d) => s + (d.tempmax || d.temp), 0) / week.length;
+            const avgTempMin = week.reduce((s, d) => s + (d.tempmin || d.temp - 3), 0) / week.length;
+            const totalPrecip = week.reduce((s, d) => s + (d.precip || 0), 0);
+            const tmS = getTempMaxStatus(avgTempMax); const tmnS = getTempMinStatus(avgTempMin); const prS = getPrecipStatus(totalPrecip, weekIdx);
+            globalPrecip = globalPrecip.concat(week.map(d => d.precip || 0));
+            const tap = getTaponamiento(globalPrecip, weekNum); const ac = getAcame(avgTempMax); const ia = getIndiceAgua(totalPrecip, weekIdx);
+            html += `<tr>
+                <td><strong>${weekNum}</strong></td>
+                <td>${formatDate(week[0].datetime)} - ${formatDate(week[week.length - 1].datetime)}</td>
+                <td>${avgTempMax.toFixed(1)}</td><td>${avgTempMin.toFixed(1)}</td><td>${totalPrecip.toFixed(1)}</td>
+                <td><span class="semaphore ${tmS.class}"></span></td>
+                <td><span class="semaphore ${tmnS.class}"></span></td>
+                <td><span class="semaphore ${prS.class}"></span></td>
+                <td><span class="status-badge ${tap.class}">${tap.text}</span></td>
+                <td><span class="semaphore ${ac.class}"></span></td>
+                <td><span class="status-badge ${ia.class}">${ia.text}</span></td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        periodInfo.textContent = `${predioNombre || 'Predio'} · ${formatDate(filteredDays[0].datetime)} → ${formatDate(filteredDays[filteredDays.length-1].datetime)} (${filteredDays.length} días)`;
+        document.getElementById('precipInfoHist').textContent = `📊 Rangos de precipitación por semana del cultivo (Siembra: ${formatDate(startDate)})`;
+    }
+
+    // ============================================================
+    // UTILIDADES
+    // ============================================================
+    function obtenerFechaHoraArchivo() {
+        const n = new Date();
+        return `${n.getFullYear()}${String(n.getMonth()+1).padStart(2,'0')}${String(n.getDate()).padStart(2,'0')}_${String(n.getHours()).padStart(2,'0')}${String(n.getMinutes()).padStart(2,'0')}${String(n.getSeconds()).padStart(2,'0')}`;
+    }
+    function obtenerPrimerNombre(n) { if (!n || typeof n !== 'string') return 'ANON'; const t = n.trim(); if (!t) return 'ANON'; return t.split(/\s+/)[0].toUpperCase().substring(0, 10); }
+    function calcularAreaHectareas(coords) {
+        if (!coords || coords.length < 3) return 0;
+        const R = 6371000; const toRad = d => d * Math.PI / 180;
+        let area = 0; const n = coords.length;
+        for (let i = 0; i < n; i++) {
+            const j = (i + 1) % n; const p1 = coords[i], p2 = coords[j];
+            area += (toRad(p2[1]) - toRad(p1[1])) * (2 + Math.sin(toRad(p1[0])) + Math.sin(toRad(p2[0])));
+        }
+        return Math.abs(area * R * R / 2) / 10000;
+    }
+    function getCentroid(coords) { let la = 0, lo = 0; coords.forEach(c => { la += c[0]; lo += c[1]; }); return { lat: la / coords.length, lng: lo / coords.length }; }
+    function formatCoordenadasGMS(coords) {
+        if (!coords || coords.length === 0) return '';
+        return coords.map(([lat, lng]) => {
+            const latD = Math.floor(Math.abs(lat)); const latM = Math.floor((Math.abs(lat) - latD) * 60); const latS = ((Math.abs(lat) - latD - latM/60) * 3600).toFixed(2);
+            const lngD = Math.floor(Math.abs(lng)); const lngM = Math.floor((Math.abs(lng) - lngD) * 60); const lngS = ((Math.abs(lng) - lngD - lngM/60) * 3600).toFixed(2);
+            return `${lat >= 0 ? 'N' : 'S'}${latD}°${String(latM).padStart(2,'0')}'${String(latS).padStart(5,'0')}" ${lng >= 0 ? 'E' : 'O'}${lngD}°${String(lngM).padStart(2,'0')}'${String(lngS).padStart(5,'0')}"`;
+        }).join('; ');
+    }
+    function formatCoordenadasDecimal(coords) { if (!coords || coords.length === 0) return ''; return coords.map(([lat, lng]) => `${lat.toFixed(6)}, ${lng.toFixed(6)}`).join('; '); }
+    function mostrarMensaje(msg, duration = 3000) {
+        const t = document.createElement('div');
+        t.style.cssText = `position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:white;padding:10px 24px;border-radius:12px;font-size:0.9rem;z-index:99999;border:1px solid #1e3a5f;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:90%;text-align:center;transition:opacity 0.3s ease;white-space:pre-line;`;
+        t.textContent = msg; document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, duration);
+    }
+
+    // ============================================================
+    // GITHUB SYNC
+    // ============================================================
+    async function leerArchivoGitHub(ruta) {
+        const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}?t=${Date.now()}`;
+        try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (res.ok) { const d = await res.json(); return JSON.parse(decodeURIComponent(escape(atob(d.content)))); }
+        } catch (e) { console.log('Error leyendo', ruta, e); }
+        return null;
+    }
+    async function cargarDatosDesdeGitHub() {
+        const u = await leerArchivoGitHub('usuarios.json');
+        dbUsuarios = (Array.isArray(u) && u.length > 0) ? u.filter(x => x && x.usuario && (x.passHash || x.pass)) : [];
+        const c = await leerArchivoGitHub('areas_proyectos.json');
+        dbCatalogos = (c && Array.isArray(c.areas) && c.areas.length > 0) ? c : { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: [] };
+        const p = await leerArchivoGitHub('predios.json');
+        dbPredios = (Array.isArray(p) && p.length > 0) ? p : [];
+        if (dbPredios.length > 0) {
+            const ids = dbPredios.map(x => parseInt(String(x.id).split('-')[0]) || 0);
+            contadorId = Math.max(...ids, 0) + 1;
+        }
+    }
+    async function guardarEnGitHub(ruta, obj, msg) {
+        const tok = tokenAdmin || sessionStorage.getItem('ae_github_token');
+        if (!tok) { mostrarMensaje('⚠️ Sin token de GitHub: cambio solo en memoria.', 3000); return false; }
+        const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}`;
+        let sha = "";
+        try {
+            const r = await fetch(url, { headers: { "Authorization": `token ${tok}` } });
+            if (r.ok) { const d = await r.json(); sha = d.sha; }
+        } catch (e) {}
+        const content = btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
+        const res = await fetch(url, {
+            method: "PUT",
+            headers: { "Authorization": `token ${tok}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: msg, content: content, sha: sha, branch: GITHUB_BRANCH })
+        });
+        if (res.ok) { mostrarMensaje('☁️ Guardado en GitHub', 2000); return true; }
+        mostrarMensaje('❌ Error al guardar. Revisa tu token.', 3000);
+        return false;
+    }
+
+    // ============================================================
+    // PERMISOS
+    // ============================================================
+    function esAdmin() { return sesionActual && sesionActual.rol === 'admin'; }
+    function puedeVerTodasAreas() { return esAdmin() || sesionActual?.verTodasAreas === true; }
+    function puedeCrearCualquierArea() { return esAdmin() || sesionActual?.asignarCualquierArea === true; }
+    function prediosVisibles() {
+        if (puedeVerTodasAreas()) return dbPredios;
+        return dbPredios.filter(p => p.area === sesionActual.area);
+    }
+    function areasAsignables() {
+        return puedeCrearCualquierArea() ? dbCatalogos.areas : [sesionActual.area];
+    }
+
+    // ============================================================
+    // LOGIN
+    // ============================================================
+    async function procesarLogin() {
+        const userEl = document.getElementById('loginUser');
+        const passEl = document.getElementById('loginPassword');
+        const errorEl = document.getElementById('loginError');
+        if (!userEl || !passEl) { alert('Error: inputs no encontrados'); return; }
+
+        const user = userEl.value.trim();
+        const pass = passEl.value.trim();
+
+        if (!user || !pass) { errorEl.textContent = '⚠️ Completa usuario y contraseña'; errorEl.classList.add('show'); return; }
+        if (dbUsuarios.length === 0) { errorEl.textContent = '⚠️ No hay usuarios registrados. Contacta al admin.'; errorEl.classList.add('show'); return; }
+
+        const u = dbUsuarios.find(x => x.usuario === user);
+        if (!u) { errorEl.textContent = '⚠️ Usuario o contraseña incorrectos'; errorEl.classList.add('show'); return; }
+
+        const ok = await verificarPassword(pass, u.passHash || u.pass || '');
+        if (!ok) { errorEl.textContent = '⚠️ Usuario o contraseña incorrectos'; errorEl.classList.add('show'); return; }
+
+        errorEl.classList.remove('show');
+        sesionActual = u;
+        sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+        iniciarSesion();
+    }
+
+    function iniciarSesion() {
+        document.getElementById('loginModal').classList.remove('active');
+        document.getElementById('mainContent').style.display = 'block';
+
+        document.getElementById('userBadge').textContent = '👤 ' + sesionActual.usuario;
+        document.getElementById('businessBadge').textContent = '🏢 ' + (sesionActual.area || 'Sin área');
+        const perfilBadge = document.getElementById('perfilBadge');
+        perfilBadge.textContent = '🎯 ' + sesionActual.rol.toUpperCase();
+        perfilBadge.className = 'badge ' + (sesionActual.rol === 'admin' ? 'badge-user' : sesionActual.rol === 'editor' ? 'badge-business' : 'badge-perfil');
+
+        if (!mapaInicializado) setTimeout(() => initMap(), 300);
+        setTimeout(() => {
+            dibujarTodosLosPoligonos();
+            actualizarLista();
+            actualizarContador();
+            actualizarContadorTiles();
+            actualizarIndicadorSuperficie();
+        }, 500);
+
+        mostrarMensaje(`👋 Bienvenido ${sesionActual.usuario}\nRol: ${sesionActual.rol.toUpperCase()} · Área: ${sesionActual.area || 'N/A'}`, 4000);
+    }
+
+    function cerrarSesion() {
+        if (confirm('¿Cerrar sesión?')) {
+            sessionStorage.removeItem('ae_sesion');
+            sesionActual = null;
+            location.reload();
+        }
+    }
+
+    // ============================================================
+    // INDICADOR SUPERFICIE / PREDIOS
+    // ============================================================
+    function actualizarIndicadorSuperficie() {
+        const visibles = prediosVisibles();
+        const barFill = document.getElementById('superficieBarFill');
+        const barText = document.getElementById('superficieBarText');
+        if (!barFill || !barText) return;
+        barFill.style.width = '100%';
+        barFill.className = 'superficie-bar-fill';
+        barText.textContent = `${visibles.length} predios visibles`;
+    }
+
+    // ============================================================
+    // MAPA
+    // ============================================================
+    function initMap() {
+        if (mapaInicializado || mapaInicializando) return;
+        const mc = document.getElementById('map');
+        if (!mc || mc.offsetParent === null) { setTimeout(initMap, 500); return; }
+        try {
+            mapaInicializando = true;
+            map = L.map('map', { center: [23.6345, -102.5528], zoom: 5, zoomControl: true });
+            osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 });
+            hybridLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { attribution: '© Google', maxZoom: 20, subdomains: ['mt1', 'mt2', 'mt3'] });
+            esriLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© ESRI', maxZoom: 19 });
+            osmLayer.addTo(map);
+            drawnItems = L.featureGroup().addTo(map);
+            drawControl = new L.Control.Draw({
+                position: 'topleft',
+                draw: { polygon: { allowIntersection: false, showArea: true, shapeOptions: { color: '#1e3a5f', weight: 3 } }, rectangle: false, circle: false, circlemarker: false, marker: false, polyline: false },
+                edit: { featureGroup: drawnItems, remove: false }
+            });
+            map.addControl(drawControl);
+            document.querySelectorAll('#layerControl button').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('#layerControl button').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const layer = this.dataset.layer;
+                    map.removeLayer(osmLayer); map.removeLayer(hybridLayer); map.removeLayer(esriLayer);
+                    if (layer === 'osm') osmLayer.addTo(map);
+                    else if (layer === 'hybrid') hybridLayer.addTo(map);
+                    else if (layer === 'esri') esriLayer.addTo(map);
+                });
+            });
+            map.on(L.Draw.Event.CREATED, function(e) {
+                if (e.layerType === 'polygon') {
+                    const layer = e.layer; const latlngs = layer.getLatLngs()[0];
+                    if (latlngs && latlngs.length >= 3) {
+                        const coords = latlngs.map(ll => [ll.lat, ll.lng]);
+                        polygonCoords = coords; currentPolygon = layer;
+                        showPopupForPolygon(layer, coords);
+                    }
+                }
+            });
+            map.on(L.Draw.DRAWSTART, function() {
+                if (currentPolygon) { drawnItems.removeLayer(currentPolygon); currentPolygon = null; polygonCoords = null; }
+            });
+            mapaInicializado = true; mapaInicializando = false;
+            setTimeout(() => { if (map) map.invalidateSize(); }, 200);
+        } catch (err) { console.error('Error mapa:', err); mapaInicializando = false; }
+    }
+
+    function dibujarTodosLosPoligonos() {
+        if (!drawnItems) return;
+        drawnItems.clearLayers();
+        prediosVisibles().forEach(p => {
+            if (p.coordenadas && p.coordenadas.length > 0) {
+                try {
+                    const color = p.area === sesionActual.area ? '#2b6f3b' : '#1e6fb8';
+                    L.polygon(p.coordenadas, { color: color, weight: 2, fillOpacity: 0.2 }).addTo(drawnItems);
+                } catch (e) {}
+            }
+        });
+    }
+
+    // ============================================================
+    // POPUP CREAR PREDIO
+    // ============================================================
+    function showPopupForPolygon(layer, coords) {
+        const areaHa = calcularAreaHectareas(coords);
+        const areas = areasAsignables();
+        const puedeElegir = puedeCrearCualquierArea();
+        const optsAreas = areas.map(a => `<option value="${a}">${a}</option>`).join('');
+        const optsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+
+        const popupHTML = `
+            <div style="font-weight:700;margin-bottom:10px;">📌 Nuevo Predio</div>
+            <div style="font-size:0.8rem;color:#6b7b8d;margin-bottom:6px;">Capturista: ${sesionActual.usuario} · Área: ${sesionActual.area || 'N/A'}</div>
+            <div style="font-size:0.75rem;color:#1a7a8a;background:#e6f7fa;padding:4px 8px;border-radius:6px;margin-bottom:10px;">📐 Área: <b>${areaHa.toFixed(3)} ha</b></div>
+            <div class="popup-field"><label>Nombre:</label> <input type="text" id="popupNombre" placeholder="Ej. El Chaparral" /></div>
+            <div class="popup-field"><label>Área:</label> <select id="popupArea" ${puedeElegir ? '' : 'disabled'}>${optsAreas}</select></div>
+            <div class="popup-field"><label>Proyecto:</label> <select id="popupProyecto">${optsProyectos || '<option value="">Sin proyectos</option>'}</select></div>
+            <div class="popup-field"><label>Cultivo:</label> <select id="popupCultivo">${['Maíz','Frijol','Sorgo','Trigo','Arroz','Caña de azúcar','Algodón','Café','Cítricos','Aguacate'].map(c => `<option value="${c}">${c}</option>`).join('')}</select></div>
+            <div class="popup-field"><label>Fecha Siembra:</label> <input type="date" id="popupFecha" /></div>
+            <div class="popup-field"><label>Propietario:</label> <input type="text" id="popupPropietario" placeholder="Nombre completo" /></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+                <button class="btn btn-sm" id="popupCancelBtn" style="background:#8b9bb0;">Cancelar</button>
+                <button class="btn btn-sm btn-success" id="popupSaveBtn">💾 Guardar</button>
+            </div>`;
+
+        const popup = L.popup({ minWidth: 340, maxWidth: 400, autoClose: false, closeOnClick: false })
+            .setLatLng(layer.getBounds().getCenter())
+            .setContent(popupHTML)
+            .openOn(map);
+
+        setTimeout(function() {
+            const saveBtn = document.getElementById('popupSaveBtn');
+            const cancelBtn = document.getElementById('popupCancelBtn');
+            const nombreInput = document.getElementById('popupNombre');
+            const areaSel = document.getElementById('popupArea');
+            const proyectoSel = document.getElementById('popupProyecto');
+            const cultivoSel = document.getElementById('popupCultivo');
+            const fechaInput = document.getElementById('popupFecha');
+            const propietarioInput = document.getElementById('popupPropietario');
+            const today = new Date().toISOString().split('T')[0];
+            if (fechaInput) fechaInput.value = today;
+
+            async function guardarPredio() {
+                const area = areaSel.disabled ? sesionActual.area : areaSel.value;
+                if (!puedeCrearCualquierArea() && area !== sesionActual.area) {
+                    mostrarMensaje('⚠️ No puedes crear predios en otra área.', 3000); return;
+                }
+                const nombre = nombreInput.value ? nombreInput.value.trim() : 'Sin nombre';
+                const cultivo = cultivoSel.value || 'Maíz';
+                const fechaSiembra = fechaInput.value || today;
+                const propietario = propietarioInput.value ? propietarioInput.value.trim() : 'Anónimo';
+                const proyecto = proyectoSel.value || '';
+                const fechaStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+                const idGenerado = String(contadorId++).padStart(3,'0') + '-' + fechaStr + '-' + obtenerPrimerNombre(propietario);
+
+                dbPredios.push({
+                    id: idGenerado, nombre, area, proyecto, cultivo, fechaSiembra, propietario,
+                    superficie: areaHa || 0, coordenadas: coords || [],
+                    fechaCaptura: new Date().toISOString(),
+                    capturista: sesionActual.usuario
+                });
+                L.polygon(coords, { color: '#2b6f3b', weight: 2, fillOpacity: 0.2 }).addTo(drawnItems);
+                if (currentPolygon) { drawnItems.removeLayer(currentPolygon); currentPolygon = null; }
+                polygonCoords = null;
+                map.closePopup();
+                await guardarEnGitHub('predios.json', dbPredios, 'Agregar predio');
+                actualizarLista(); actualizarContador(); actualizarIndicadorSuperficie();
+                mostrarMensaje('✅ Predio guardado. Superficie: ' + (areaHa || 0).toFixed(3) + ' ha');
+            }
+            if (saveBtn) saveBtn.addEventListener('click', guardarPredio);
+            if (cancelBtn) cancelBtn.addEventListener('click', function() {
+                if (currentPolygon) { drawnItems.removeLayer(currentPolygon); currentPolygon = null; polygonCoords = null; }
+                map.closePopup();
+            });
+        }, 100);
+
+        popup.on('remove', function() {
+            if (currentPolygon) { drawnItems.removeLayer(currentPolygon); currentPolygon = null; polygonCoords = null; }
+        });
+    }
+
+    // ============================================================
+    // LISTA PREDIOS
+    // ============================================================
+    function actualizarLista() {
+        const container = document.getElementById('prediosList');
+        if (!container) return;
+        const visibles = prediosVisibles();
+        if (visibles.length === 0) {
+            container.innerHTML = '<div class="empty-message">No hay predios registrados.</div>';
+            actualizarIndicadorSuperficie(); return;
+        }
+        const esEditor = sesionActual.rol === 'editor' || sesionActual.rol === 'admin';
+        let html = '';
+        visibles.forEach(p => {
+            const isEditing = (editingId === p.id);
+            html += `
+                <div class="predio-item ${isEditing ? 'editing' : ''}" data-id="${p.id}">
+                    <span style="font-weight:600;font-size:0.7rem;">${p.id}</span>
+                    <input type="text" value="${p.nombre || 'Sin nombre'}" data-field="nombre" ${isEditing ? '' : 'disabled'} />
+                    <select data-field="cultivo" ${isEditing ? '' : 'disabled'}>
+                        ${['Maíz','Frijol','Sorgo','Trigo','Arroz','Caña de azúcar','Algodón','Café','Cítricos','Aguacate'].map(c => `<option value="${c}" ${c === p.cultivo ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                    <input type="date" value="${p.fechaSiembra || ''}" data-field="fechaSiembra" ${isEditing ? '' : 'disabled'} />
+                    <input type="text" value="${p.area || ''}" data-field="area" ${isEditing ? '' : 'disabled'} />
+                    <input type="text" value="${p.proyecto || ''}" data-field="proyecto" ${isEditing ? '' : 'disabled'} />
+                    <input type="text" value="${p.propietario || 'Anónimo'}" data-field="propietario" ${isEditing ? '' : 'disabled'} />
+                    <span style="font-weight:600;background:#e6f0fa;padding:1px 6px;border-radius:12px;font-size:0.7rem;">${p.superficie ? p.superficie.toFixed(3) : '0.000'}</span>
+                    <span></span>
+                    <div class="acciones-container">
+                        ${isEditing ? `
+                            <button class="icon-btn save-edit" data-id="${p.id}" title="Guardar">💾</button>
+                            <button class="icon-btn cancel-edit" data-id="${p.id}" title="Cancelar">✖️</button>
+                        ` : `
+                            <button class="icon-btn weather" data-id="${p.id}" title="Ver clima">🌤️</button>
+                            <button class="icon-btn zoom" data-id="${p.id}" title="Ir">👁️</button>
+                            <button class="icon-btn export-kml" data-id="${p.id}" title="KML">📁</button>
+                            ${esEditor ? `<button class="icon-btn edit" data-id="${p.id}" title="Editar">✏️</button>` : ''}
+                            ${esAdmin() ? `<button class="icon-btn delete" data-id="${p.id}" title="Eliminar">🗑️</button>` : ''}
+                        `}
+                    </div>
+                </div>`;
+        });
+        container.innerHTML = html;
+        container.querySelectorAll('.icon-btn.save-edit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); guardarEdicion(b.dataset.id); }));
+        container.querySelectorAll('.icon-btn.cancel-edit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); editingId = null; actualizarLista(); }));
+        container.querySelectorAll('.icon-btn.weather').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); cargarClimaPredio(b.dataset.id); }));
+        container.querySelectorAll('.icon-btn.zoom').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); irAlPredio(b.dataset.id); }));
+        container.querySelectorAll('.icon-btn.export-kml').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); exportarPredioKML(b.dataset.id); }));
+        container.querySelectorAll('.icon-btn.edit').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); editingId = b.dataset.id; actualizarLista(); }));
+        container.querySelectorAll('.icon-btn.delete').forEach(b => b.addEventListener('click', async e => {
+            e.stopPropagation();
+            if (confirm('¿Eliminar este predio?')) {
+                dbPredios = dbPredios.filter(p => p.id !== b.dataset.id);
+                dibujarTodosLosPoligonos(); actualizarLista(); actualizarContador();
+                await guardarEnGitHub('predios.json', dbPredios, 'Eliminar predio');
+                actualizarIndicadorSuperficie();
+            }
+        }));
+        actualizarIndicadorSuperficie();
+    }
+
+    function guardarEdicion(id) {
+        const item = document.querySelector(`.predio-item[data-id="${id}"]`);
+        if (!item) return;
+        const p = dbPredios.find(x => x.id === id);
+        if (!p) return;
+        item.querySelectorAll('input, select').forEach(el => {
+            const f = el.dataset.field;
+            if (f) p[f] = el.value;
+        });
+        editingId = null;
+        guardarEnGitHub('predios.json', dbPredios, 'Editar predio');
+        actualizarLista(); mostrarMensaje('✅ Cambios guardados', 2000);
+    }
+
+    function actualizarContador() {
+        document.getElementById('contador').textContent = prediosVisibles().length;
+    }
+
+    function irAlPredio(id) {
+        const p = dbPredios.find(x => x.id === id);
+        if (!p || !p.coordenadas || p.coordenadas.length === 0) return;
+        const bounds = L.latLngBounds(p.coordenadas.map(c => L.latLng(c[0], c[1])));
+        if (bounds.isValid()) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 });
+    }
+
+    function exportarPredioKML(id) {
+        const p = dbPredios.find(x => x.id === id);
+        if (!p || !p.coordenadas || p.coordenadas.length === 0) { mostrarMensaje('❌ Sin coordenadas', 2000); return; }
+        const coordsStr = p.coordenadas.map(ll => ll[1] + ',' + ll[0] + ',0').join(' ');
+        let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n';
+        kml += `<Placemark><name>${p.id} - ${p.propietario}</name><description>${p.nombre} | ${p.area} | ${p.superficie.toFixed(3)} ha</description><Polygon><outerBoundaryIs><LinearRing><coordinates>${coordsStr}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n`;
+        kml += '</Document>\n</kml>';
+        descargarArchivo(kml, `predio_${p.id}.kml`, 'application/vnd.google-earth.kml+xml');
+        mostrarMensaje('✅ KML exportado', 2000);
+    }
+
+    function descargarArchivo(content, filename, mimeType) {
+        const blob = new Blob(['\uFEFF' + content], { type: mimeType + ';charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob); link.download = filename;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    // ============================================================
+    // CLIMA - CARGA
+    // ============================================================
+    async function cargarClimaPredio(predioId) {
+        const p = dbPredios.find(x => x.id === predioId);
+        if (!p || !p.coordenadas || p.coordenadas.length === 0) { mostrarMensaje('❌ Sin coordenadas', 2000); return; }
+        currentPredioId = predioId;
+        const centro = getCentroid(p.coordenadas);
+        historicalDays = null;
+
+        const modal = document.getElementById('weatherModal');
+        document.getElementById('weatherModalTitle').textContent = `🌤️ Clima - ${p.nombre || 'Predio'}`;
+        modal.classList.add('active');
+        document.querySelectorAll('.weather-tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.weather-modal-tabs button').forEach(b => b.classList.remove('active'));
+        document.querySelector('.weather-modal-tabs button[data-tab="actual"]').classList.add('active');
+        document.getElementById('tab-actual').classList.add('active');
+
+        const currentDiv = document.getElementById('weatherCurrent');
+        const forecastDiv = document.getElementById('weatherForecast');
+        const histBody = document.getElementById('histTableBody');
+        currentDiv.innerHTML = `<p><i class="fas fa-spinner fa-spin"></i> Cargando clima...</p>`;
+        forecastDiv.innerHTML = `<p style="text-align:center;font-size:0.7rem;"><i class="fas fa-spinner fa-spin"></i> Cargando pronóstico...</p>`;
+        histBody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#7f8c8d;font-size:0.75rem;">Carga el histórico con el botón</td></tr>';
+
+        try {
+            const w = await fetchCurrentWeather(centro.lat, centro.lng);
+            currentDiv.innerHTML = `<p><strong>🌡️ ${w.temp}°C</strong> (sensación ${w.feelslike}°C)</p>
+                <p>📊 Max ${w.tempmax}°C · Min ${w.tempmin}°C</p>
+                <p>💧 ${w.humidity}% · 🌧️ ${w.precip}mm · 💨 ${w.windspeed}km/h</p>
+                <p style="font-size:0.7rem;color:#5a7a94;">📅 ${w.date} · ${w.conditions}</p>`;
+
+            const forecast = await fetchForecast(centro.lat, centro.lng, 15);
+            const weeks = groupByWeeks(forecast);
+            let chartData = [];
+            let html = `<div class="weather-grid">`;
+            weeks.forEach((week, idx) => {
+                const wi = idx + 1;
+                const tMax = week.reduce((s, d) => s + (d.tempmax || d.temp), 0) / week.length;
+                const tMin = week.reduce((s, d) => s + (d.tempmin || d.temp - 3), 0) / week.length;
+                const prec = week.reduce((s, d) => s + (d.precip || 0), 0);
+                chartData.push({ semana: `S${wi}`, tMaxVal: tMax, tMinVal: tMin, precVal: prec });
+                const tmS = getTempMaxStatus(tMax), tmnS = getTempMinStatus(tMin), prS = getPrecipStatus(prec, wi), acS = getAcame(tMax), iaS = getIndiceAgua(prec, wi);
+                html += `<div class="weather-item">
+                    <div class="fecha">${formatDateShort(week[0].datetime)}-${formatDateShort(week[week.length-1].datetime)}</div>
+                    <div class="fila"><span class="etq">Máx</span><span class="val"><span class="semaphore ${tmS.class}"></span><span class="val-text">${tmS.text}</span></span></div>
+                    <div class="fila"><span class="etq">Mín</span><span class="val"><span class="semaphore ${tmnS.class}"></span><span class="val-text">${tmnS.text}</span></span></div>
+                    <div class="fila"><span class="etq">Precip</span><span class="val"><span class="semaphore ${prS.class}"></span><span class="val-text">${prS.text}</span></span></div>
+                    <div class="fila"><span class="etq">Acame</span><span class="val"><span class="semaphore ${acS.class}"></span><span class="val-text">${acS.text}</span></span></div>
+                    <div class="fila"><span class="etq">I.Agua</span><span class="val"><span class="semaphore ${iaS.class}"></span><span class="val-text">${iaS.text}</span></span></div>
+                    <div class="fila-temp">${tMax.toFixed(0)}°/${tMin.toFixed(0)}°</div>
+                </div>`;
+            });
+            html += `</div><div class="weather-legend"><span class="item"><span class="semaphore semaphore-green"></span> Óptimo</span><span class="item"><span class="semaphore semaphore-yellow"></span> Precaución</span><span class="item"><span class="semaphore semaphore-red"></span> Alerta</span><span class="item"><span class="semaphore semaphore-gray"></span> N/A</span></div>`;
+            forecastDiv.innerHTML = html;
+
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            const ctx = document.getElementById('weatherChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.map(d => d.semana),
+                    datasets: [
+                        { label: 'T. Máxima (°C)', data: chartData.map(d => parseFloat(d.tMaxVal.toFixed(1))), backgroundColor: 'rgba(52,152,219,0.7)', borderColor: 'rgba(52,152,219,1)', borderWidth: 1, borderRadius: 4 },
+                        { label: 'T. Mínima (°C)', data: chartData.map(d => parseFloat(d.tMinVal.toFixed(1))), backgroundColor: 'rgba(230,126,34,0.7)', borderColor: 'rgba(230,126,34,1)', borderWidth: 1, borderRadius: 4 },
+                        { label: 'Precipitación (mm)', data: chartData.map(d => parseFloat(d.precVal.toFixed(1))), backgroundColor: 'rgba(46,204,113,0.7)', borderColor: 'rgba(46,204,113,1)', borderWidth: 1, borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 10 } } } }, scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } } }
+            });
+        } catch (err) {
+            currentDiv.innerHTML = `<p style="color:#b33;"><i class="fas fa-exclamation-circle"></i> ${err.message}</p>`;
+        }
+    }
+
+    async function cargarHistoricoModal() {
+        const p = dbPredios.find(x => x.id === currentPredioId);
+        if (!p || !p.fechaSiembra) { mostrarMensaje('⚠️ Predio sin fecha de siembra', 2000); return; }
+        const centro = getCentroid(p.coordenadas);
+        const histBody = document.getElementById('histTableBody');
+        const loadBtn = document.getElementById('loadHistoricalBtn');
+        loadBtn.disabled = true; loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+        try {
+            const days = await fetchWeeklyHistorical(centro.lat, centro.lng, p.fechaSiembra, 4);
+            historicalDays = days;
+            buildHistoricalTable(days, p.fechaSiembra, p.nombre, 4);
+            mostrarMensaje('✅ Histórico cargado', 2000);
+        } catch (err) {
+            histBody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:#b33;">❌ ${err.message}</td></tr>`;
+        } finally {
+            loadBtn.disabled = false; loadBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Cargar Histórico';
+        }
+    }
+
+    // ============================================================
+    // TILES
+    // ============================================================
+    function tileToLatLng(x, y, z) {
+        const n = Math.pow(2, z); const lon = (x / n) * 360 - 180;
+        const yN = y / n; const latR = Math.atan(Math.sinh(Math.PI * (1 - 2 * yN)));
+        return { lat: latR * 180 / Math.PI, lng: lon };
+    }
+    function getTileBounds(x, y, z) {
+        const nw = tileToLatLng(x, y, z); const se = tileToLatLng(x + 1, y + 1, z);
+        return L.latLngBounds([Math.min(nw.lat, se.lat), Math.min(nw.lng, se.lng)], [Math.max(nw.lat, se.lat), Math.max(nw.lng, se.lng)]);
+    }
+    function addTileToMap(x, y, z, dataUrl) {
+        const key = `${z}/${x}/${y}`;
+        if (tileLayers[key]) return;
+        try {
+            const bounds = getTileBounds(x, y, z);
+            const overlay = L.imageOverlay(dataUrl, bounds, { opacity: 1, interactive: false });
+            overlay.addTo(map); tileLayers[key] = overlay; tileCount++;
+            if (!tileBounds) tileBounds = bounds; else tileBounds.extend(bounds);
+            actualizarContadorTiles();
+        } catch (e) {}
+    }
+    async function loadTilesFromZip(file) {
+        try {
+            const ab = await file.arrayBuffer(); const zip = await JSZip.loadAsync(ab);
+            let imgs = [];
+            for (const [path, entry] of Object.entries(zip.files)) {
+                if (entry.dir) continue;
+                const ext = path.split('.').pop().toLowerCase();
+                if (!['png', 'jpg', 'jpeg'].includes(ext)) continue;
+                const parts = path.split('/'); let z, x, y;
+                if (parts.length === 4 && parts[0] === 'tiles') { z = parseInt(parts[1]); x = parseInt(parts[2]); y = parseInt(parts[3].split('.')[0]); }
+                else if (parts.length === 3) { z = parseInt(parts[0]); x = parseInt(parts[1]); y = parseInt(parts[2].split('.')[0]); }
+                if (!isNaN(z) && !isNaN(x) && !isNaN(y)) imgs.push({ path, z, x, y, file: entry });
+            }
+            if (imgs.length === 0) { mostrarMensaje('❌ No hay tiles en el ZIP', 3000); return; }
+            mostrarMensaje(`📦 Cargando ${imgs.length} tiles...`, 3000);
+            const bs = 20;
+            for (let i = 0; i < imgs.length; i += bs) {
+                const batch = imgs.slice(i, i + bs);
+                await Promise.all(batch.map(async (it) => {
+                    try { const b64 = await it.file.async('base64'); addTileToMap(it.x, it.y, it.z, `data:image/png;base64,${b64}`); } catch (e) {}
+                }));
+                actualizarContadorTiles();
+            }
+            if (tileBounds) map.fitBounds(tileBounds, { padding: [20, 20] });
+            mostrarMensaje(`✅ ${tileCount} tiles cargados`, 3000);
+        } catch (err) { mostrarMensaje('❌ Error ZIP: ' + err.message, 4000); }
+    }
+    function clearTiles() {
+        for (const k in tileLayers) { map.removeLayer(tileLayers[k]); delete tileLayers[k]; }
+        tileLayers = {}; tileCount = 0; tileBounds = null; actualizarContadorTiles();
+        mostrarMensaje('🗑️ Tiles eliminados', 2000);
+    }
+    function actualizarContadorTiles() {
+        document.getElementById('tileCount').textContent = tileCount;
+        document.getElementById('tileStatus').style.display = tileCount > 0 ? 'inline-flex' : 'none';
+    }
+
+    // ============================================================
+    // EXPORTAR CSV/KML
+    // ============================================================
+    function exportarCSV() {
+        const visibles = prediosVisibles();
+        if (visibles.length === 0) { mostrarMensaje('No hay predios', 2000); return; }
+        const headers = ['ID', 'Nombre', 'Area', 'Proyecto', 'Cultivo', 'FechaSiembra', 'Propietario', 'Superficie_ha', 'Capturista', 'Fecha_Captura', 'Coordenadas'];
+        let rows = [headers.join(',')];
+        visibles.forEach(p => {
+            rows.push([`"${p.id}"`, `"${p.nombre || ''}"`, `"${p.area || ''}"`, `"${p.proyecto || ''}"`, `"${p.cultivo || ''}"`, `"${p.fechaSiembra || ''}"`, `"${p.propietario || ''}"`, (p.superficie || 0).toFixed(4), `"${p.capturista || ''}"`, `"${p.fechaCaptura || ''}"`, `"${formatCoordenadasDecimal(p.coordenadas)}"`].join(','));
+        });
+        descargarArchivo(rows.join('\n'), `predios_${sesionActual.usuario}_${obtenerFechaHoraArchivo()}.csv`, 'text/csv;charset=utf-8');
+        mostrarMensaje(`✅ ${visibles.length} predios exportados`, 2500);
+    }
+    function exportarKML() {
+        const visibles = prediosVisibles();
+        if (visibles.length === 0) { mostrarMensaje('No hay predios', 2000); return; }
+        let kml = '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n';
+        visibles.forEach(p => {
+            if (!p.coordenadas || p.coordenadas.length === 0) return;
+            const cs = p.coordenadas.map(ll => ll[1] + ',' + ll[0] + ',0').join(' ');
+            kml += `<Placemark><name>${p.id} - ${p.propietario}</name><description>${p.nombre} | ${p.area} | ${p.superficie.toFixed(3)} ha</description><Polygon><outerBoundaryIs><LinearRing><coordinates>${cs}</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>\n`;
+        });
+        kml += '</Document>\n</kml>';
+        descargarArchivo(kml, `predios_${sesionActual.usuario}_${obtenerFechaHoraArchivo()}.kml`, 'application/vnd.google-earth.kml+xml');
+        mostrarMensaje('✅ KML exportado', 2500);
+    }
+
+    // ============================================================
+    // ADMIN PANEL
+    // ============================================================
+    function abrirLoginAdmin() {
+        document.getElementById('adminUserInput').value = '';
+        document.getElementById('adminPassInput').value = '';
+        document.getElementById('adminLoginError').classList.remove('show');
+        document.getElementById('adminLoginModal').classList.add('active');
+        setTimeout(() => document.getElementById('adminUserInput').focus(), 100);
+    }
+
+    async function adminLoginHandler() {
+        const u = document.getElementById('adminUserInput').value.trim();
+        const p = document.getElementById('adminPassInput').value;
+        const found = dbUsuarios.find(x => x.usuario === u && x.rol === 'admin');
+        const errEl = document.getElementById('adminLoginError');
+        if (!found) { errEl.textContent = '⚠️ No es un usuario administrador'; errEl.classList.add('show'); return; }
+        const ok = await verificarPassword(p, found.passHash || found.pass || '');
+        if (!ok) { errEl.textContent = '⚠️ Contraseña incorrecta'; errEl.classList.add('show'); return; }
+        errEl.classList.remove('show');
+        sesionActual = found;
+        sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+        document.getElementById('adminLoginModal').classList.remove('active');
+        abrirPanelAdmin();
+    }
+
+    function abrirPanelAdmin() {
+        document.getElementById('adminTokenInput').value = tokenAdmin || '';
+        actualizarEstadoToken();
+        renderizarAdminPanel();
+        document.getElementById('adminPanelModal').classList.add('active');
+    }
+
+    function actualizarEstadoToken() {
+        const el = document.getElementById('adminTokenStatus');
+        if (!el) return;
+        if (tokenAdmin) { el.textContent = '✅ Token configurado'; el.style.color = '#2b6f3b'; }
+        else { el.textContent = '⚠️ Sin token: los cambios no se guardarán'; el.style.color = '#d48c2b'; }
+    }
+
+    function renderizarAdminPanel() {
+        const totalUsuarios = dbUsuarios.length;
+        const totalPredios = dbPredios.length;
+        document.getElementById('adminStats').innerHTML = `
+            <div class="admin-stat-card"><div class="label">👥 Usuarios</div><div class="value">${totalUsuarios}</div></div>
+            <div class="admin-stat-card"><div class="label">📋 Predios totales</div><div class="value">${totalPredios}</div></div>
+            <div class="admin-stat-card" style="border-left-color:#2b6f3b;"><div class="label">🔐 Token GitHub</div><div class="value" style="font-size:1rem;">${tokenAdmin ? '✅ Activo' : '⚠️ Sin configurar'}</div></div>
+        `;
+        const tbody = document.getElementById('adminUsersTableBody');
+        if (dbUsuarios.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#7f8c8d;">No hay usuarios</td></tr>';
+            return;
+        }
+        let html = '';
+        dbUsuarios.forEach(u => {
+            const numPredios = dbPredios.filter(p => p.capturista === u.usuario).length;
+            const rolClass = u.rol === 'admin' ? 'rol-admin' : u.rol === 'editor' ? 'rol-editor' : 'rol-visualizador';
+            html += `<tr>
+                <td><strong>${u.usuario}</strong></td>
+                <td>${u.nombre || '-'}</td>
+                <td><span class="badge-rol ${rolClass}">${u.rol}</span></td>
+                <td>${u.area || '-'}</td>
+                <td>
+                    <span class="permiso-tag ${u.verTodasAreas ? 'permiso-on' : 'permiso-off'}">👁️ ${u.verTodasAreas ? 'Sí' : 'No'}</span>
+                    <span class="permiso-tag ${u.asignarCualquierArea ? 'permiso-on' : 'permiso-off'}">✏️ ${u.asignarCualquierArea ? 'Sí' : 'No'}</span>
+                </td>
+                <td>${numPredios}</td>
+                <td>
+                    <div class="admin-actions-cell">
+                        <button class="admin-btn-edit" data-action="edit" data-id="${u.id}">✏️ Editar</button>
+                        <button class="admin-btn-delete" data-action="delete" data-id="${u.id}">🗑️</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        tbody.querySelectorAll('button[data-action]').forEach(b => b.addEventListener('click', function() {
+            const a = this.dataset.action; const id = this.dataset.id;
+            if (a === 'edit') abrirEditarUsuario(id);
+            else if (a === 'delete') eliminarUsuario(id);
+        }));
+    }
+
+    async function guardarTokenAdmin() {
+        const v = document.getElementById('adminTokenInput').value.trim();
+        if (!v) { mostrarMensaje('Token vacío', 2000); return; }
+        tokenAdmin = v; sessionStorage.setItem('ae_github_token', v);
+        actualizarEstadoToken(); renderizarAdminPanel();
+        mostrarMensaje('✅ Token guardado en esta sesión', 2500);
+    }
+    function borrarTokenAdmin() {
+        tokenAdmin = ''; sessionStorage.removeItem('ae_github_token');
+        document.getElementById('adminTokenInput').value = '';
+        actualizarEstadoToken(); renderizarAdminPanel();
+        mostrarMensaje('🗑️ Token eliminado', 2000);
+    }
+
+    async function crearUsuarioAdmin() {
+        const nombre = document.getElementById('adminNewNombre').value.trim();
+        const usuario = document.getElementById('adminNewUsuario').value.trim();
+        const pass = document.getElementById('adminNewPass').value.trim();
+        const rol = document.getElementById('adminNewRol').value;
+        const area = document.getElementById('adminNewArea').value.trim();
+        const verTodas = document.getElementById('adminNewVerTodas').checked;
+        const asignarCualquier = document.getElementById('adminNewAsignarCualquier').checked;
+
+        if (!nombre || !usuario || !pass) { mostrarMensaje('⚠️ Completa nombre, usuario y contraseña', 2500); return; }
+        if (pass.length < 8) { mostrarMensaje('⚠️ Contraseña mínimo 8 caracteres', 2500); return; }
+        if (dbUsuarios.some(u => u.usuario === usuario)) { mostrarMensaje('⚠️ Ese usuario ya existe', 2500); return; }
+
+        dbUsuarios.push({
+            id: Date.now(), nombre, usuario,
+            passHash: await generarHashPassword(pass),
+            rol, area: area || 'Agricola',
+            verTodasAreas: verTodas, asignarCualquierArea: asignarCualquier,
+            tokenHash: ''
+        });
+        await guardarEnGitHub('usuarios.json', dbUsuarios, `Crear usuario ${usuario}`);
+        document.getElementById('adminNewNombre').value = '';
+        document.getElementById('adminNewUsuario').value = '';
+        document.getElementById('adminNewPass').value = '';
+        document.getElementById('adminNewVerTodas').checked = false;
+        document.getElementById('adminNewAsignarCualquier').checked = false;
+        renderizarAdminPanel();
+        mostrarMensaje('✅ Usuario creado', 2500);
+    }
+
+    function abrirEditarUsuario(id) {
+        const u = dbUsuarios.find(x => String(x.id) === String(id));
+        if (!u) return;
+        document.getElementById('adminEditUserId').value = u.id;
+        document.getElementById('adminEditUserName').value = u.nombre || '';
+        document.getElementById('adminEditUserUsuario').value = u.usuario;
+        document.getElementById('adminEditUserRol').value = u.rol;
+        document.getElementById('adminEditUserArea').value = u.area || '';
+        document.getElementById('adminEditVerTodas').checked = !!u.verTodasAreas;
+        document.getElementById('adminEditAsignarCualquier').checked = !!u.asignarCualquierArea;
+        document.getElementById('adminEditUserSub').textContent = `Editando: ${u.usuario}`;
+        document.getElementById('adminEditUserError').classList.remove('show');
+        document.getElementById('adminEditUserModal').classList.add('active');
+    }
+
+    async function guardarEdicionUsuario() {
+        const id = document.getElementById('adminEditUserId').value;
+        const u = dbUsuarios.find(x => String(x.id) === String(id));
+        if (!u) return;
+        const nuevoUser = document.getElementById('adminEditUserUsuario').value.trim();
+        if (!nuevoUser) { document.getElementById('adminEditUserError').textContent = '⚠️ Usuario requerido'; document.getElementById('adminEditUserError').classList.add('show'); return; }
+        if (dbUsuarios.some(x => String(x.id) !== String(id) && x.usuario === nuevoUser)) {
+            document.getElementById('adminEditUserError').textContent = '⚠️ Ya existe otro usuario con ese nombre';
+            document.getElementById('adminEditUserError').classList.add('show'); return;
+        }
+        u.nombre = document.getElementById('adminEditUserName').value.trim();
+        u.usuario = nuevoUser;
+        u.rol = document.getElementById('adminEditUserRol').value;
+        u.area = document.getElementById('adminEditUserArea').value.trim();
+        u.verTodasAreas = document.getElementById('adminEditVerTodas').checked;
+        u.asignarCualquierArea = document.getElementById('adminEditAsignarCualquier').checked;
+        await guardarEnGitHub('usuarios.json', dbUsuarios, `Editar usuario ${u.usuario}`);
+        document.getElementById('adminEditUserModal').classList.remove('active');
+        renderizarAdminPanel();
+        mostrarMensaje('✅ Usuario actualizado', 2500);
+    }
+
+    async function eliminarUsuario(id) {
+        const u = dbUsuarios.find(x => String(x.id) === String(id));
+        if (!u) return;
+        if (dbUsuarios.length <= 1) { mostrarMensaje('⚠️ No puedes eliminar el último usuario', 2500); return; }
+        if (sesionActual && String(sesionActual.id) === String(id)) { mostrarMensaje('⚠️ No puedes eliminar tu propio usuario', 2500); return; }
+        if (!confirm(`¿Eliminar al usuario "${u.usuario}"?\nSus predios NO se eliminarán.`)) return;
+        dbUsuarios = dbUsuarios.filter(x => String(x.id) !== String(id));
+        await guardarEnGitHub('usuarios.json', dbUsuarios, `Eliminar usuario ${u.usuario}`);
+        renderizarAdminPanel();
+        mostrarMensaje('🗑️ Usuario eliminado', 2500);
+    }
+
+    // ============================================================
+    // EVENTOS
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', async function() {
+        await cargarDatosDesdeGitHub();
+        const savedSesion = sessionStorage.getItem('ae_sesion');
+        if (savedSesion) {
+            try {
+                sesionActual = JSON.parse(savedSesion);
+                if (dbUsuarios.find(u => u.usuario === sesionActual.usuario)) {
+                    iniciarSesion();
+                    return;
+                }
+            } catch (e) {}
+        }
+        document.getElementById('loginModal').classList.add('active');
+        document.getElementById('mainContent').style.display = 'none';
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', procesarLogin);
+    document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') procesarLogin(); });
+    document.getElementById('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPassword').focus(); });
+    document.getElementById('openAdminBtn').addEventListener('click', abrirLoginAdmin);
+    document.getElementById('adminLoginSubmit').addEventListener('click', adminLoginHandler);
+    document.getElementById('adminLoginCancel').addEventListener('click', () => document.getElementById('adminLoginModal').classList.remove('active'));
+    document.getElementById('adminPassInput').addEventListener('keydown', e => { if (e.key === 'Enter') adminLoginHandler(); });
+    document.getElementById('adminPanelClose').addEventListener('click', () => document.getElementById('adminPanelModal').classList.remove('active'));
+    document.getElementById('adminSaveToken').addEventListener('click', guardarTokenAdmin);
+    document.getElementById('adminDeleteToken').addEventListener('click', borrarTokenAdmin);
+    document.getElementById('adminCreateUser').addEventListener('click', crearUsuarioAdmin);
+    document.getElementById('adminEditCancel').addEventListener('click', () => document.getElementById('adminEditUserModal').classList.remove('active'));
+    document.getElementById('adminEditSave').addEventListener('click', guardarEdicionUsuario);
+
+    document.getElementById('drawPolygonBtn').addEventListener('click', function() {
+        if (mapaInicializado && map && drawControl) new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
+        else mostrarMensaje('⏳ Espera a que el mapa cargue', 2000);
+    });
+    document.getElementById('clearAllBtn').addEventListener('click', async function() {
+        if (!confirm('¿Eliminar TODOS los predios?')) return;
+        dbPredios = []; editingId = null;
+        if (drawnItems) drawnItems.clearLayers();
+        await guardarEnGitHub('predios.json', dbPredios, 'Limpiar predios');
+        actualizarLista(); actualizarContador(); actualizarIndicadorSuperficie();
+        mostrarMensaje('🗑️ Predios eliminados', 2000);
+    });
+    document.getElementById('exportKmlBtn').addEventListener('click', exportarKML);
+    document.getElementById('exportCsvBtn').addEventListener('click', exportarCSV);
+    document.getElementById('recoverBtn').addEventListener('click', async function() {
+        await cargarDatosDesdeGitHub();
+        dibujarTodosLosPoligonos(); actualizarLista(); actualizarContador(); actualizarIndicadorSuperficie();
+        mostrarMensaje('🔄 Datos recargados desde GitHub', 2500);
+    });
+    document.getElementById('logoutBtn').addEventListener('click', cerrarSesion);
+    document.getElementById('loadTilesBtn').addEventListener('click', () => document.getElementById('zipInput').click());
+    document.getElementById('zipInput').addEventListener('change', function() { if (this.files && this.files[0]) loadTilesFromZip(this.files[0]); this.value = ''; });
+    document.getElementById('clearTilesBtn').addEventListener('click', clearTiles);
+
+    document.querySelectorAll('.weather-modal-tabs button').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tab = this.dataset.tab;
+            document.querySelectorAll('.weather-modal-tabs button').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.weather-tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+        });
+    });
+    document.getElementById('loadHistoricalBtn').addEventListener('click', cargarHistoricoModal);
+    document.getElementById('weatherModalClose').addEventListener('click', () => {
+        document.getElementById('weatherModal').classList.remove('active');
+        if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    });
+
+    window.addEventListener('resize', () => { if (map) setTimeout(() => map.invalidateSize(), 300); });
+
+})();
+</script>
+</body>
+</html>
