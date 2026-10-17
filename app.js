@@ -15,18 +15,9 @@ const catalogosDefault = {
     proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José']
 };
 
-const usuariosDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' },
-    { id: 2, usuario: 'visualizador1', pass: 'vis123', rol: 'visualizador', nombre: 'Visualizador 1' },
-    { id: 3, usuario: 'visualizador2', pass: 'vis123', rol: 'visualizador', nombre: 'Visualizador 2' },
-    { id: 4, usuario: 'visualizador3', pass: 'vis123', rol: 'visualizador', nombre: 'Visualizador 3' },
-    { id: 5, usuario: 'visualizador4', pass: 'vis123', rol: 'visualizador', nombre: 'Visualizador 4' },
-    { id: 6, usuario: 'visualizador5', pass: 'vis123', rol: 'visualizador', nombre: 'Visualizador 5' },
-    { id: 7, usuario: 'editor1', pass: 'edit123', rol: 'editor', nombre: 'Editor 1' },
-    { id: 8, usuario: 'editor2', pass: 'edit123', rol: 'editor', nombre: 'Editor 2' },
-    { id: 9, usuario: 'editor3', pass: 'edit123', rol: 'editor', nombre: 'Editor 3' },
-    { id: 10, usuario: 'editor4', pass: 'edit123', rol: 'editor', nombre: 'Editor 4' },
-    { id: 11, usuario: 'editor5', pass: 'edit123', rol: 'editor', nombre: 'Editor 5' }
+// Única cuenta por defecto: El Administrador (los demás se crean desde su panel)
+const usuarioAdminDefault = [
+    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -66,19 +57,16 @@ async function leerArchivoGitHub(ruta) {
 }
 
 async function cargarDatosDesdeGitHub() {
-    dbUsuarios = await leerArchivoGitHub('usuarios.json') || usuariosDefault;
+    dbUsuarios = await leerArchivoGitHub('usuarios.json') || usuarioAdminDefault;
     dbCatalogos = await leerArchivoGitHub('areas_proyectos.json') || catalogosDefault;
     dbTareas = await leerArchivoGitHub('tareas.json') || [
-        { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Editor 1' },
-        { id: 2, titulo: 'Calibración Estación Meteorológica', area: 'Meteorologia', proyecto: 'Atlas de Riesgo Municipal', estado: 'Concluida', avance: 100, fechaLimite: '2026-04-10', responsable: 'Editor 2' }
+        { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
     ];
 }
 
 async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
-    // Guardar siempre localmente primero para fluidez absoluta
     localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
 
-    // Si es Administrador y tiene token configurado, sincronizamos con GitHub en la nube
     if (sesionActual?.rol === 'admin' && tokenAdmin) {
         const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
         let sha = "";
@@ -108,14 +96,8 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
 }
 
 // ================= AUTENTICACIÓN (LOGIN) =================
-function abrirModalLogin() { 
-    // Mostrar u ocultar el campo de token dependiendo si se desea, aquí lo dejamos disponible
-    document.getElementById('modalLogin').classList.remove('hidden'); 
-}
-
-function cerrarModalLogin() { 
-    document.getElementById('modalLogin').classList.add('hidden'); 
-}
+function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
+function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
 function procesarLogin() {
     const user = document.getElementById('loginUser').value.trim();
@@ -128,7 +110,6 @@ function procesarLogin() {
         sesionActual = encontrado;
         sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
 
-        // Si es el administrador y proporcionó su token, lo guardamos
         if (encontrado.rol === 'admin' && token) {
             tokenAdmin = token;
             sessionStorage.setItem('ae_github_token', token);
@@ -256,13 +237,14 @@ function generarVistaAdmin() {
     `).join('');
 
     let htmlUsuariosAdmin = dbUsuarios.map(u => `
-        <div class="p-4 bg-white rounded-2xl border border-slate-200 flex justify-between items-center text-sm">
+        <div class="p-4 bg-white rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
             <div>
-                <span class="font-bold">${u.nombre}</span> <span class="text-xs text-blue-600 font-semibold">(${u.usuario})</span> — Rol: <strong>${u.rol}</strong>
+                <span class="font-bold">${u.nombre}</span> <span class="text-xs text-blue-600 font-semibold">(${u.usuario})</span> — Rol: <strong class="uppercase text-xs px-2 py-0.5 bg-slate-100 rounded">${u.rol}</strong>
             </div>
-            <div class="flex gap-2">
-                <input type="text" id="pass_${u.id}" value="${u.pass}" class="w-24 px-2 py-1 border rounded-lg text-xs">
-                <button onclick="actualizarPasswordUser(${u.id})" class="bg-slate-100 px-3 py-1 rounded-lg text-xs font-semibold">Cambiar Pass</button>
+            <div class="flex items-center gap-2">
+                <input type="text" id="pass_${u.id}" value="${u.pass}" class="w-28 px-2.5 py-1.5 border rounded-xl text-xs" placeholder="Nueva pass">
+                <button onclick="actualizarPasswordUser(${u.id})" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold">Cambiar</button>
+                ${u.rol !== 'admin' ? `<button onclick="eliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold">Eliminar</button>` : ''}
             </div>
         </div>
     `).join('');
@@ -284,6 +266,22 @@ function generarVistaAdmin() {
                 </div>
             </div>
 
+            <!-- Módulo de Creación de Usuarios -->
+            <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                <h3 class="font-extrabold text-slate-900 text-lg">➕ Generar Nuevo Usuario y Rol</h3>
+                <div class="grid sm:grid-cols-4 gap-3">
+                    <input type="text" id="nuevoNombreUser" placeholder="Nombre completo" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="text" id="nuevoUserLogin" placeholder="Usuario (login)" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="password" id="nuevoUserPass" placeholder="Contraseña" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <select id="nuevoUserRol" class="px-4 py-2.5 border rounded-xl text-sm bg-white">
+                        <option value="editor">Editor</option>
+                        <option value="visualizador">Visualizador</option>
+                    </select>
+                </div>
+                <button onclick="crearNuevoUsuario()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow transition">Crear Usuario</button>
+            </div>
+
+            <!-- Gestión de Catálogos (Áreas y Proyectos) -->
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
                 <h3 class="font-extrabold text-slate-900 text-lg">📁 Gestión de Catálogos</h3>
                 <div class="grid sm:grid-cols-2 gap-6">
@@ -307,7 +305,7 @@ function generarVistaAdmin() {
             </div>
 
             <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-                <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios y Contraseñas</h3>
+                <h3 class="font-extrabold text-slate-900 text-lg">👥 Gestión de Usuarios Registrados</h3>
                 <div class="space-y-3">${htmlUsuariosAdmin}</div>
             </div>
 
@@ -319,7 +317,32 @@ function generarVistaAdmin() {
     `;
 }
 
-// ================= ACCIONES =================
+// ================= ACCIONES DE ADMIN Y EDITORES =================
+async function crearNuevoUsuario() {
+    const nombre = document.getElementById('nuevoNombreUser').value.trim();
+    const usuario = document.getElementById('nuevoUserLogin').value.trim();
+    const pass = document.getElementById('nuevoUserPass').value.trim();
+    const rol = document.getElementById('nuevoUserRol').value;
+
+    if (!nombre || !usuario || !pass) {
+        mostrarToast('Completa todos los campos para crear el usuario.', 'error');
+        return;
+    }
+
+    dbUsuarios.push({ id: Date.now(), nombre, usuario, pass, rol });
+    await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear nuevo usuario');
+    mostrarToast('Usuario creado con éxito.');
+    renderizarInterfazPorRol();
+}
+
+async function eliminarUsuario(id) {
+    if (confirm('¿Eliminar este usuario permanentemente?')) {
+        dbUsuarios = dbUsuarios.filter(u => u.id !== id);
+        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
+        renderizarInterfazPorRol();
+    }
+}
+
 async function agregarTareaEditor() {
     const titulo = document.getElementById('nuevaTareaTitulo').value.trim();
     const area = document.getElementById('nuevaTareaArea').value;
