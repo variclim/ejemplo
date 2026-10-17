@@ -1,10 +1,10 @@
 [
   {
     "id": 1,
-    "usuario": "admin",
-    "pass": "admin123",
-    "rol": "admin",
     "nombre": "Administrador General",
+    "usuario": "admin",
+    "pass": "YWRtaW4xMjM=",
+    "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": ""
   }
