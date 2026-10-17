@@ -16,7 +16,7 @@ const catalogosDefault = {
 };
 
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
+    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'El mero Chiludon' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
