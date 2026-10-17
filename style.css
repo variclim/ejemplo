@@ -1,6 +1,9 @@
 body {
     font-family: 'Inter', sans-serif;
 }
-* {
-    box-sizing: border-box;
+@media print {
+    body * { visibility: hidden; }
+    #printableReport, #printableReport * { visibility: visible; }
+    #printableReport { position: absolute; left: 0; top: 0; width: 100%; }
+    .no-print { display: none !important; }
 }
