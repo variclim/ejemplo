@@ -5,5 +5,12 @@
     "pass": "admin123",
     "rol": "admin",
     "nombre": "Administrador General"
+  },
+  {
+    "id": 1792207630940,
+    "nombre": "Juancho",
+    "usuario": "juan",
+    "pass": "juan1",
+    "rol": "visualizador"
   }
 ]
