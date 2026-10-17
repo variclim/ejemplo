@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Profesional | Control de Metas e Informes</title>
+    <title>Agenda Electrónica Institucional | Control de Metas e Informes</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
         <!-- Notificación Flotante -->
         <div id="toast" class="fixed top-5 right-5 z-50 hidden transition-all duration-300 transform translate-y-0 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm"></div>
 
-        <!-- Navbar Principal con Control de Sesión -->
+        <!-- Navbar Principal -->
         <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
@@ -31,7 +31,7 @@
             </div>
         </nav>
 
-        <!-- CONTENEDOR PRINCIPAL DINÁMICO SEGÚN ROL -->
+        <!-- CONTENEDOR PRINCIPAL DONDE SE DIBUJAN LAS PANTALLAS SEGÚN EL ROL -->
         <main id="appContainer" class="space-y-6">
             <!-- Estado Inicial: Pantalla de Bienvenida -->
             <div class="bg-white p-12 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4">
@@ -53,7 +53,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Usuario</label>
-                    <input type="text" id="loginUser" placeholder="Ej. visualizador1, editor1, admin" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    <input type="text" id="loginUser" placeholder="Ej. admin, editor1, visualizador1" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Contraseña</label>
