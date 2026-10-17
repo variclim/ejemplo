@@ -82,14 +82,14 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 
     if (!tokenAdmin) {
-        const usuarioConToken = dbUsuarios.find(u => u.tokenHash);
-        if (usuarioConToken) {
-            tokenAdmin = desencriptarPass(usuarioConToken.tokenHash);
+        const adminObj = dbUsuarios.find(u => u.rol === 'admin' && u.tokenHash);
+        if (adminObj) {
+            tokenAdmin = desencriptarPass(adminObj.tokenHash);
         }
     }
 
     if (!tokenAdmin) {
-        mostrarToast('Acción detenida: Se requiere un Token de GitHub encriptado en el perfil.', 'error');
+        mostrarToast('Acción detenida: Se requiere configurar un Token de GitHub válido.', 'error');
         return false;
     }
 
@@ -124,7 +124,11 @@ function procesarLogin() {
     const user = document.getElementById('loginUser').value.trim();
     const pass = document.getElementById('loginPassword').value.trim();
 
-    const encontrado = dbUsuarios.find(u => u.usuario === user && (u.pass === pass || desencriptarPass(u.pass) === pass));
+    const encontrado = dbUsuarios.find(u => {
+        if (u.usuario !== user) return false;
+        if (u.pass === pass) return true;
+        return desencriptarPass(u.pass) === pass;
+    });
 
     if (encontrado) {
         sesionActual = encontrado;
@@ -151,7 +155,7 @@ function cerrarSesion() {
     location.reload();
 }
 
-// ================= RENDERIZADO POR PESTAÑAS =================
+// ================= NAVEGACIÓN Y RENDERIZADO =================
 function cambiarPestana(pestana) {
     pestanaActiva = pestana;
     renderizarInterfazPorRol();
@@ -259,7 +263,7 @@ function generarVistaTareas(tareas) {
     `;
 }
 
-// ================= VISTA 2: GESTIÓN DE USUARIOS CON CONTRASEÑA Y TOKEN ENCRIPTADOS =================
+// ================= VISTA 2: GESTIÓN DE USUARIOS =================
 function generarVistaUsuarios() {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
 
@@ -267,7 +271,7 @@ function generarVistaUsuarios() {
         <div class="p-4 bg-white rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
             <div>
                 <b>${u.nombre}</b> (${u.usuario}) — Rol: <b class="uppercase">${u.rol}</b> — Área: <span class="text-blue-600 font-semibold">${u.area || 'General'}</span>
-                ${u.tokenHash ? '<span class="ml-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">🔒 Token Encriptado</span>' : ''}
+                ${u.tokenHash ? '<span class="ml-2 text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">🔒 Token Asignado</span>' : ''}
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 <input type="password" id="newPass_${u.id}" placeholder="Nueva pass" class="px-2.5 py-1.5 border rounded-xl text-xs w-28">
@@ -280,7 +284,7 @@ function generarVistaUsuarios() {
     return `
         <div class="space-y-8">
             <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
-                <h3 class="font-extrabold text-lg">➕ Registrar Nuevo Usuario (Contraseña Encriptada y Token Encriptado Opcional)</h3>
+                <h3 class="font-extrabold text-lg">➕ Registrar Nuevo Usuario (Asignación de Contraseña y Token Cifrados)</h3>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     <input type="text" id="uNombre" placeholder="Nombre completo" class="px-4 py-2.5 border rounded-xl text-sm">
                     <input type="text" id="uLogin" placeholder="Usuario (login)" class="px-4 py-2.5 border rounded-xl text-sm">
@@ -291,7 +295,7 @@ function generarVistaUsuarios() {
                         <option value="admin">Administrador</option>
                     </select>
                     <select id="uArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${optionsAreas}</select>
-                    <input type="password" id="uToken" placeholder="Token de GitHub (Se guardará encriptado)" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="password" id="uToken" placeholder="Token de GitHub a asignar (Cifrado)" class="px-4 py-2.5 border rounded-xl text-sm">
                 </div>
                 <button onclick="crearUsuario()" class="bg-purple-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow">Registrar Usuario con Cifrado</button>
             </div>
