@@ -3,27 +3,10 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "pass": "LTMyMXhhbG9j",
+    "passHash": "1970b8c8d8cd1b84df002bd33e2182ff19e344ee49402e3b2e54e4ff8eb625a5",
+    "passSalt": "demo_salt",
     "rol": "admin",
     "area": "Coordinacion",
-    "tokenHash": "NldVUjA0M1dwcVVZbXRaNW52MTlvVnNHRkpKaE9WT2lSdjFiX3BoZw=="
-  },
-  {
-    "id": 1792210613881,
-    "nombre": "uno",
-    "usuario": "uno",
-    "pass": "LTMyMXhhbG9j",
-    "rol": "editor",
-    "area": "Administracion",
-    "tokenHash": ""
-  },
-  {
-    "id": 1792210821946,
-    "nombre": "juan",
-    "usuario": "juan",
-    "pass": "bm9sZXA=",
-    "rol": "visualizador",
-    "area": "Geomatica",
     "tokenHash": ""
   }
 ]
