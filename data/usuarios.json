@@ -3,8 +3,7 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "passHash": "1970b8c8d8cd1b84df002bd33e2182ff19e344ee49402e3b2e54e4ff8eb625a5",
-    "passSalt": "demo_salt",
+    "passHash": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
     "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": ""
