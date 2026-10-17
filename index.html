@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Institucional</title>
+    <title>Agenda Electrónica Institucional con GitHub DB</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>body { font-family: 'Inter', sans-serif; }</style>
@@ -19,7 +19,7 @@
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
                 <div>
                     <h1 class="font-extrabold text-slate-900 text-lg tracking-tight">Agenda Electrónica Institucional</h1>
-                    <p class="text-xs text-slate-500">Gestión de Tareas, Metas e Informes</p>
+                    <p class="text-xs text-slate-500">Sincronizada con GitHub Repository (data/)</p>
                 </div>
             </div>
             <div id="navSessionInfo" class="flex items-center gap-3">
@@ -32,13 +32,13 @@
             <div class="bg-white p-12 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4">
                 <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">🔒</div>
                 <h2 class="text-2xl font-extrabold text-slate-900">Bienvenido a la Agenda Electrónica</h2>
-                <p class="text-sm text-slate-500 max-w-md mx-auto">Inicia sesión con la cuenta de Administrador para comenzar a operar el sistema.</p>
+                <p class="text-sm text-slate-500 max-w-md mx-auto">Inicia sesión con tu cuenta e ingresa tu Token de GitHub para administrar y sincronizar con la nube.</p>
                 <button onclick="abrirModalLogin()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow text-sm">Ingresar al Sistema</button>
             </div>
         </main>
     </div>
 
-    <!-- Modal Login -->
+    <!-- Modal Login con Token -->
     <div id="modalLogin" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6">
             <div class="text-center">
@@ -54,6 +54,10 @@
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Contraseña</label>
                     <input type="password" id="loginPassword" value="admin123" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (PAT)</label>
+                    <input type="password" id="loginTokenGitHub" placeholder="ghp_..." class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                </div>
             </div>
             <div class="flex gap-3 pt-2">
                 <button onclick="cerrarModalLogin()" class="w-1/2 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm">Cancelar</button>
@@ -63,51 +67,148 @@
     </div>
 
     <script>
-        // Base de Datos en Memoria con persistencia en localStorage
-        let dbUsuarios = JSON.parse(localStorage.getItem('ae_usuarios')) || [
-            { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
-        ];
+        // ================= CONFIGURACIÓN GITHUB =================
+        const GITHUB_USER = "variclim";
+        const GITHUB_REPO = "ejemplo";
+        const GITHUB_BRANCH = "main";
 
-        let dbCatalogos = JSON.parse(localStorage.getItem('ae_catalogos')) || {
+        let tokenAdmin = sessionStorage.getItem('ae_github_token') || "";
+        let sesionActual = JSON.parse(sessionStorage.getItem('ae_sesion')) || null;
+
+        let dbUsuarios = [];
+        let dbCatalogos = { areas: [], proyectos: [] };
+        let dbTareas = [];
+
+        const catalogosDefault = {
             areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'],
             proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José']
         };
 
-        let dbTareas = JSON.parse(localStorage.getItem('ae_tareas')) || [
-            { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
+        const usuarioAdminDefault = [
+            { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
         ];
 
-        let sesionActual = JSON.parse(localStorage.getItem('ae_sesion')) || null;
-
-        window.addEventListener('DOMContentLoaded', () => {
-            if (sesionActual) renderizarInterfazPorRol();
+        window.addEventListener('DOMContentLoaded', async () => {
+            await cargarDatosDesdeGitHub();
+            if (sesionActual) {
+                renderizarInterfazPorRol();
+            }
         });
 
         function mostrarToast(msg, tipo = 'success') {
             const toast = document.getElementById('toast');
+            if(!toast) return;
             toast.textContent = msg;
             toast.className = `fixed top-5 right-5 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all ${tipo === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 3000);
         }
 
-        function guardarDatos() {
-            localStorage.setItem('ae_usuarios', JSON.stringify(dbUsuarios));
-            localStorage.setItem('ae_catalogos', JSON.stringify(dbCatalogos));
-            localStorage.setItem('ae_tareas', JSON.stringify(dbTareas));
+        // ================= CONEXIÓN CON GITHUB =================
+        async function leerArchivoGitHub(ruta) {
+            const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${ruta}`;
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    const data = await res.json();
+                    const decoded = decodeURIComponent(escape(atob(data.content)));
+                    return JSON.parse(decoded);
+                }
+            } catch (e) {
+                console.log(`Error al leer ${ruta} de GitHub, usando local.`);
+            }
+            return null;
         }
 
+        async function cargarDatosDesdeGitHub() {
+            try {
+                const usuariosRemotos = await leerArchivoGitHub('usuarios.json');
+                dbUsuarios = Array.isArray(usuariosRemotos) && usuariosRemotos.length > 0 ? usuariosRemotos : usuarioAdminDefault;
+
+                const catalogosRemotos = await leerArchivoGitHub('areas_proyectos.json');
+                if (catalogosRemotos && !Array.isArray(catalogosRemotos)) {
+                    dbCatalogos.areas = Array.isArray(catalogosRemotos.areas) ? catalogosRemotos.areas : catalogosDefault.areas;
+                    dbCatalogos.proyectos = Array.isArray(catalogosRemotos.proyectos) ? catalogosRemotos.proyectos : catalogosDefault.proyectos;
+                } else {
+                    dbCatalogos = JSON.parse(JSON.stringify(catalogosDefault));
+                }
+
+                const tareasRemotas = await leerArchivoGitHub('tareas.json');
+                dbTareas = Array.isArray(tareasRemotas) ? tareasRemotas : [
+                    { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
+                ];
+            } catch (err) {
+                dbUsuarios = usuarioAdminDefault;
+                dbCatalogos = JSON.parse(JSON.stringify(catalogosDefault));
+                dbTareas = [];
+            }
+        }
+
+        async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
+            // Respaldar localmente
+            localStorage.setItem(`ae_local_${rutaArchivo}`, JSON.stringify(contenidoObjeto));
+
+            if (!tokenAdmin) {
+                mostrarToast('Guardado local (Sin token de Admin configurado).', 'error');
+                return false;
+            }
+
+            const url = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/data/${rutaArchivo}`;
+            let sha = "";
+
+            try {
+                const resGet = await fetch(url, { headers: { "Authorization": `token ${tokenAdmin}` } });
+                if (resGet.ok) {
+                    const data = await resGet.json();
+                    sha = data.sha;
+                }
+            } catch (e) {}
+
+            const contenidoBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(contenidoObjeto, null, 2))));
+
+            const resPut = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    "Authorization": `token ${tokenAdmin}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: mensajeCommit,
+                    content: contenidoBase64,
+                    sha: sha,
+                    branch: GITHUB_BRANCH
+                })
+            });
+
+            if (resPut.ok) {
+                mostrarToast('¡Sincronizado con GitHub con éxito!');
+                return true;
+            } else {
+                mostrarToast('Error al actualizar en GitHub (Verifica tu Token PAT).', 'error');
+                return false;
+            }
+        }
+
+        // ================= AUTENTICACIÓN =================
         function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
         function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
         function procesarLogin() {
             const user = document.getElementById('loginUser').value.trim();
             const pass = document.getElementById('loginPassword').value.trim();
+            const token = document.getElementById('loginTokenGitHub').value.trim();
+
             const encontrado = dbUsuarios.find(u => u.usuario === user && u.pass === pass);
 
             if (encontrado) {
                 sesionActual = encontrado;
-                localStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+                sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+
+                if (token) {
+                    tokenAdmin = token;
+                    sessionStorage.setItem('ae_github_token', token);
+                }
+
                 cerrarModalLogin();
                 mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
                 renderizarInterfazPorRol();
@@ -117,13 +218,16 @@
         }
 
         function cerrarSesion() {
-            localStorage.removeItem('ae_sesion');
+            sessionStorage.removeItem('ae_sesion');
+            sessionStorage.removeItem('ae_github_token');
             sesionActual = null;
+            tokenAdmin = "";
             location.reload();
         }
 
         function renderizarInterfazPorRol() {
             const navInfo = document.getElementById('navSessionInfo');
+            if(!navInfo) return;
             const rolColors = { admin: 'bg-purple-100 text-purple-800', editor: 'bg-blue-100 text-blue-800', visualizador: 'bg-emerald-100 text-emerald-800' };
 
             navInfo.innerHTML = `
@@ -135,13 +239,15 @@
             `;
 
             const container = document.getElementById('appContainer');
+            if (!container) return;
+
             if (sesionActual.rol === 'visualizador') container.innerHTML = generarVistaVisualizador();
             else if (sesionActual.rol === 'editor') container.innerHTML = generarVistaEditor();
             else if (sesionActual.rol === 'admin') container.innerHTML = generarVistaAdmin();
         }
 
         function generarVistaVisualizador() {
-            let htmlTareas = dbTareas.map(t => `
+            let htmlTareas = (dbTareas || []).map(t => `
                 <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
                     <div>
                         <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
@@ -160,10 +266,10 @@
         }
 
         function generarVistaEditor() {
-            let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
-            let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+            let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+            let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
 
-            let htmlTareas = dbTareas.map(t => `
+            let htmlTareas = (dbTareas || []).map(t => `
                 <div class="p-5 bg-white rounded-2xl border shadow-sm flex justify-between items-center">
                     <div>
                         <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
@@ -195,17 +301,17 @@
         }
 
         function generarVistaAdmin() {
-            let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
-            let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+            let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+            let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
 
-            let htmlUsuarios = dbUsuarios.map(u => `
+            let htmlUsuarios = (dbUsuarios || []).map(u => `
                 <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
                     <span><b>${u.nombre}</b> (${u.usuario}) — Rol: <b>${u.rol}</b></span>
                     ${u.rol !== 'admin' ? `<button onclick="adminEliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded text-xs font-semibold">Eliminar</button>` : ''}
                 </div>
             `).join('');
 
-            let htmlTareas = dbTareas.map(t => `
+            let htmlTareas = (dbTareas || []).map(t => `
                 <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
                     <span><b>${t.titulo}</b> (${t.area} / ${t.proyecto})</span>
                     <button onclick="adminEliminarTarea(${t.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded text-xs font-semibold">Eliminar</button>
@@ -215,8 +321,8 @@
             return `
                 <div class="space-y-8">
                     <div class="grid sm:grid-cols-3 gap-4">
-                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Total Tareas</span><h3 class="text-3xl font-extrabold mt-1">${dbTareas.length}</h3></div>
-                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Concluidas</span><h3 class="text-3xl font-extrabold text-emerald-600 mt-1">${dbTareas.filter(t => t.estado === 'Concluida').length}</h3></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Total Tareas</span><h3 class="text-3xl font-extrabold mt-1">${(dbTareas || []).length}</h3></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Concluidas</span><h3 class="text-3xl font-extrabold text-emerald-600 mt-1">${(dbTareas || []).filter(t => t.estado === 'Concluida').length}</h3></div>
                         <div class="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between"><span class="text-xs font-bold text-slate-400 uppercase">Informes</span><button onclick="exportarCSV()" class="bg-emerald-600 text-white font-semibold text-xs py-2 px-4 rounded-xl">📥 Exportar CSV</button></div>
                     </div>
 
@@ -234,8 +340,8 @@
                     <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
                         <h3 class="font-extrabold text-lg">📁 Catálogos</h3>
                         <div class="grid sm:grid-cols-2 gap-6">
-                            <div><input type="text" id="catArea" placeholder="Nueva Área" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarArea()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Área</button><p class="text-xs text-slate-500 mt-2">${dbCatalogos.areas.join(', ')}</p></div>
-                            <div><input type="text" id="catProj" placeholder="Nuevo Proyecto" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarProyecto()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Proyecto</button><p class="text-xs text-slate-500 mt-2">${dbCatalogos.proyectos.join(', ')}</p></div>
+                            <div><input type="text" id="catArea" placeholder="Nueva Área" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarArea()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Área</button><p class="text-xs text-slate-500 mt-2">${(dbCatalogos?.areas || []).join(', ')}</p></div>
+                            <div><input type="text" id="catProj" placeholder="Nuevo Proyecto" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarProyecto()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Proyecto</button><p class="text-xs text-slate-500 mt-2">${(dbCatalogos?.proyectos || []).join(', ')}</p></div>
                         </div>
                     </div>
 
@@ -256,83 +362,88 @@
             `;
         }
 
-        // Acciones
-        function adminCrearUsuario() {
+        // Acciones con sincronización en GitHub
+        async function adminCrearUsuario() {
             const nombre = document.getElementById('nuevoNombre').value.trim();
             const usuario = document.getElementById('nuevoUser').value.trim();
             const pass = document.getElementById('nuevoPass').value.trim();
             const rol = document.getElementById('nuevoRol').value;
             if (!nombre || !usuario || !pass) return alert('Completa todos los campos.');
             dbUsuarios.push({ id: Date.now(), nombre, usuario, pass, rol });
-            guardarDatos();
-            mostrarToast('Usuario creado.');
+            await guardarEnGitHub('usuarios.json', dbUsuarios, 'Crear usuario');
             renderizarInterfazPorRol();
         }
 
-        function adminEliminarUsuario(id) {
+        async function adminEliminarUsuario(id) {
             dbUsuarios = dbUsuarios.filter(u => u.id !== id);
-            guardarDatos();
+            await guardarEnGitHub('usuarios.json', dbUsuarios, 'Eliminar usuario');
             renderizarInterfazPorRol();
         }
 
-        function adminAgregarArea() {
+        async function adminAgregarArea() {
             const val = document.getElementById('catArea').value.trim();
-            if (val && !dbCatalogos.areas.includes(val)) { dbCatalogos.areas.push(val); guardarDatos(); renderizarInterfazPorRol(); }
+            if (val && !dbCatalogos.areas.includes(val)) {
+                dbCatalogos.areas.push(val);
+                await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar área');
+                renderizarInterfazPorRol();
+            }
         }
 
-        function adminAgregarProyecto() {
+        async function adminAgregarProyecto() {
             const val = document.getElementById('catProj').value.trim();
-            if (val && !dbCatalogos.proyectos.includes(val)) { dbCatalogos.proyectos.push(val); guardarDatos(); renderizarInterfazPorRol(); }
+            if (val && !dbCatalogos.proyectos.includes(val)) {
+                dbCatalogos.proyectos.push(val);
+                await guardarEnGitHub('areas_proyectos.json', dbCatalogos, 'Agregar proyecto');
+                renderizarInterfazPorRol();
+            }
         }
 
-        function adminCrearTarea() {
+        async function adminCrearTarea() {
             const titulo = document.getElementById('admTitulo').value.trim();
             const area = document.getElementById('admArea').value;
             const proyecto = document.getElementById('admProj').value;
             const fechaLimite = document.getElementById('admFecha').value;
             if (!titulo || !fechaLimite) return alert('Completa título y fecha.');
             dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: 'Administrador' });
-            guardarDatos();
-            mostrarToast('Tarea creada.');
+            await guardarEnGitHub('tareas.json', dbTareas, 'Crear tarea admin');
             renderizarInterfazPorRol();
         }
 
-        function editorAgregarTarea() {
+        async function editorAgregarTarea() {
             const titulo = document.getElementById('edTitulo').value.trim();
             const area = document.getElementById('edArea').value;
             const proyecto = document.getElementById('edProyecto').value;
             const fechaLimite = document.getElementById('edFecha').value;
             if (!titulo || !fechaLimite) return alert('Completa campos.');
             dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: sesionActual.nombre });
-            guardarDatos();
-            mostrarToast('Tarea agregada.');
+            await guardarEnGitHub('tareas.json', dbTareas, 'Agregar tarea editor');
             renderizarInterfazPorRol();
         }
 
-        function actualizarAvance(id, val) {
+        async function actualizarAvance(id, val) {
             const t = dbTareas.find(x => x.id === id);
             if (t) {
                 t.avance = parseInt(val) || 0;
                 if (t.avance >= 100) { t.avance = 100; t.estado = 'Concluida'; }
                 else t.estado = 'Pendiente';
-                guardarDatos();
+                await guardarEnGitHub('tareas.json', dbTareas, 'Actualizar avance');
                 renderizarInterfazPorRol();
             }
         }
 
-        function toggleConcluir(id) {
+        async function toggleConcluir(id) {
             const t = dbTareas.find(x => x.id === id);
             if (t) {
                 t.estado = t.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
                 if (t.estado === 'Concluida') t.avance = 100;
-                guardarDatos();
+                await guardarEnGitHub('tareas.json', dbTareas, 'Cambiar estado');
                 renderizarInterfazPorRol();
             }
         }
 
-        function adminEliminarTarea(id) {
+        async function adminEliminarTarea(id) {
             dbTareas = dbTareas.filter(t => t.id !== id);
-            guardarDatos();
+            await guardarEnGitHub('tareas.json', dbTareas, 'Eliminar tarea');
             renderizarInterfazPorRol();
         }
 
