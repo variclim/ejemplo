@@ -12,7 +12,7 @@ let dbTareas = [];
 let pestanaActiva = 'tareas'; 
 
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', passHash: '1970b8c8d8cd1b84df002bd33e2182ff19e344ee49402e3b2e54e4ff8eb625a5', passSalt: 'demo_salt', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
+    { id: 1, usuario: 'admin', passHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
@@ -35,31 +35,17 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// ================= SEGURIDAD ROBUSTA (SHA-256 con Salt) =================
-function generarSalt() {
-    const array = new Uint8Array(16);
-    window.crypto.getRandomValues(array);
-    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-async function encriptarPassSegura(password, salt = null) {
-    if (!password) return { hash: '', salt: '' };
-    const saltUsado = salt || generarSalt();
+// ================= SEGURIDAD CRIPTOGRÁFICA (SHA-256) =================
+async function encriptarSHA256(texto) {
+    if (!texto) return '';
     const encoder = new TextEncoder();
-    const data = encoder.encode(password + saltUsado);
+    const data = encoder.encode(texto);
     const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
-    return { hash: hashHex, salt: saltUsado };
+    return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function verificarPassword(passwordIngresada, hashGuardado, saltGuardado) {
-    if (!passwordIngresada || !hashGuardado) return false;
-    const resultado = await encriptarPassSegura(passwordIngresada, saltGuardado);
-    return resultado.hash === hashGuardado;
-}
-
-// Función auxiliar para tokens de GitHub (cifrado simétrico sencillo)
+// Cifrado simétrico independiente para tokens de GitHub
 function encriptarPass(texto) {
     if (!texto) return '';
     try { return btoa(encodeURIComponent(texto).split('').reverse().join('')); } catch(e) { return texto; }
@@ -156,11 +142,12 @@ async function procesarLogin() {
     const encontrado = dbUsuarios.find(u => u.usuario === user);
 
     if (encontrado) {
-        // Valida contra SHA-256 con Salt, o compatibilidad con campo "pass" antiguo si existe
-        const esValida = await verificarPassword(pass, encontrado.passHash, encontrado.passSalt);
-        const esTextoPlano = encontrado.pass === pass;
+        const passHashIngresada = await encriptarSHA256(pass);
+        
+        // Compara contra passHash segura o pass en texto plano por compatibilidad
+        const esValida = (encontrado.passHash && encontrado.passHash === passHashIngresada) || (encontrado.pass === pass);
 
-        if (esValida || esTextoPlano) {
+        if (esValida) {
             sesionActual = encontrado;
             sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
 
@@ -341,7 +328,7 @@ function generarVistaUsuarios() {
     `;
 }
 
-// ================= VISTA 3: CALENDARIO =================
+// ================= VISTA 3: CALENDARIO GRÁFICO =================
 function generarVistaCalendario(tareas) {
     const tareasOrdenadas = [...tareas].sort((a, b) => new Date(a.fechaLimite) - new Date(b.fechaLimite));
     let htmlTarjetas = tareasOrdenadas.map(t => `
@@ -378,7 +365,7 @@ function generarVistaInformes(tareas) {
     `;
 }
 
-// ================= ACCIONES DE USUARIOS Y TAREAS =================
+// ================= ACCIONES =================
 async function guardarTokenAdmin() {
     const rawToken = sanearTexto(document.getElementById('adminTokenInput').value.trim());
     if (!rawToken) return alert('Ingresa un token válido.');
@@ -398,10 +385,8 @@ async function cambiarPasswordUsuario(id) {
     if (!inputPass) return alert('Ingresa la nueva contraseña.');
     const usuarioObj = dbUsuarios.find(u => u.id === id);
     if (usuarioObj) {
-        const cred = await encriptarPassSegura(inputPass);
-        usuarioObj.passHash = cred.hash;
-        usuarioObj.passSalt = cred.salt;
-        delete usuarioObj.pass; // limpiar pass antigua si existía
+        usuarioObj.passHash = await encriptarSHA256(inputPass);
+        delete usuarioObj.pass; // limpia pass plana previa si existía
         await guardarEnGitHub('usuarios.json', dbUsuarios, `Actualizar contraseña de ${usuarioObj.usuario}`);
         mostrarToast(`Contraseña actualizada de forma segura para ${usuarioObj.nombre}.`);
         renderizarInterfazPorRol();
@@ -417,14 +402,14 @@ async function crearUsuario() {
     const area = document.getElementById('uArea').value;
 
     if (!nombre || !usuario || !pass) return alert('Completa todos los campos.');
-    const cred = await encriptarPassSegura(pass);
+
+    const passHash = await encriptarSHA256(pass);
 
     dbUsuarios.push({
         id: Date.now(),
         nombre,
         usuario,
-        passHash: cred.hash,
-        passSalt: cred.salt,
+        passHash,
         rol,
         area,
         tokenHash: ""
