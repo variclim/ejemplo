@@ -9,16 +9,21 @@ let sesionActual = JSON.parse(sessionStorage.getItem('ae_sesion')) || null;
 let dbUsuarios = [];
 let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'], proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José'] };
 let dbTareas = [];
-let pestanaActiva = 'tareas'; // 'tareas', 'usuarios', 'calendario', 'informes'
-let vistaCalendarioActual = 'mes'; // 'mes', 'semana'
+let pestanaActiva = 'tareas'; 
 
 const usuarioAdminDefault = [
-    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion' }
+    { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
 
 window.addEventListener('DOMContentLoaded', async () => {
     await cargarDatosDesdeGitHub();
-    if (sesionActual) renderizarInterfazPorRol();
+    if (sesionActual) {
+        if (!tokenAdmin && sesionActual.rol === 'admin' && sesionActual.tokenHash) {
+            tokenAdmin = desencriptarPass(sesionActual.tokenHash);
+            sessionStorage.setItem('ae_github_token', tokenAdmin);
+        }
+        renderizarInterfazPorRol();
+    }
 });
 
 function mostrarToast(msg, tipo = 'success') {
@@ -30,12 +35,13 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// Encriptación simple segura de contraseñas para ocultarlas en el JSON
+// Cifrado simétrico independiente para contraseñas y tokens
 function encriptarPass(texto) {
+    if (!texto) return '';
     return btoa(encodeURIComponent(texto).split('').reverse().join(''));
 }
 function desencriptarPass(hash) {
-    try { return decodeURIComponent(atob(hash).split('').reverse().join('')); } catch(e) { return hash; }
+    try { return decodeURIComponent(atob(hash).split('').reverse().join('')); } catch(e) { return ''; }
 }
 
 // ================= CONEXIÓN GITHUB =================
@@ -72,7 +78,14 @@ async function cargarDatosDesdeGitHub() {
 
 async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     if (!tokenAdmin) {
-        mostrarToast('Guardado local (Sin token de Admin).', 'error');
+        const adminConToken = dbUsuarios.find(u => u.rol === 'admin' && u.tokenHash);
+        if (adminConToken) {
+            tokenAdmin = desencriptarPass(adminConToken.tokenHash);
+        }
+    }
+
+    if (!tokenAdmin) {
+        mostrarToast('Acción detenida: No hay Token de GitHub configurado por el Administrador.', 'error');
         return false;
     }
 
@@ -94,7 +107,7 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
         mostrarToast('¡Sincronizado con GitHub con éxito!');
         return true;
     } else {
-        mostrarToast('Error al actualizar en GitHub.', 'error');
+        mostrarToast('Error al actualizar en GitHub (Verifica el Token del Admin).', 'error');
         return false;
     }
 }
@@ -106,17 +119,18 @@ function cerrarModalLogin() { document.getElementById('modalLogin').classList.ad
 function procesarLogin() {
     const user = document.getElementById('loginUser').value.trim();
     const pass = document.getElementById('loginPassword').value.trim();
-    const token = document.getElementById('loginTokenGitHub').value.trim();
 
     const encontrado = dbUsuarios.find(u => u.usuario === user && (u.pass === pass || desencriptarPass(u.pass) === pass));
 
     if (encontrado) {
         sesionActual = encontrado;
         sessionStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
-        if (token && encontrado.rol === 'admin') {
-            tokenAdmin = token;
-            sessionStorage.setItem('ae_github_token', token);
+
+        if (encontrado.rol === 'admin' && encontrado.tokenHash) {
+            tokenAdmin = desencriptarPass(encontrado.tokenHash);
+            sessionStorage.setItem('ae_github_token', tokenAdmin);
         }
+
         cerrarModalLogin();
         mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
         renderizarInterfazPorRol();
@@ -155,7 +169,6 @@ function renderizarInterfazPorRol() {
     const container = document.getElementById('appContainer');
     if (!container) return;
 
-    // Filtrar tareas por área si el usuario no es admin
     let tareasVisibles = dbTareas;
     if (sesionActual.rol !== 'admin') {
         tareasVisibles = dbTareas.filter(t => t.area === sesionActual.area);
@@ -169,7 +182,7 @@ function renderizarInterfazPorRol() {
     `;
 
     if (sesionActual.rol === 'admin') {
-        tabsHTML += `<button onclick="cambiarPestana('usuarios')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'usuarios' ? 'bg-purple-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">👥 Gestión de Usuarios</button>`;
+        tabsHTML += `<button onclick="cambiarPestana('usuarios')" class="px-5 py-2.5 text-xs font-bold rounded-xl transition ${pestanaActiva === 'usuarios' ? 'bg-purple-600 text-white shadow' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}">👥 Gestión de Usuarios y Token</button>`;
     }
     tabsHTML += `</div>`;
 
@@ -183,7 +196,7 @@ function renderizarInterfazPorRol() {
     container.innerHTML = tabsHTML + contenidoTab;
 }
 
-// ================= VISTA 1: TAREAS (ÁREA Y PERMISOS) =================
+// ================= VISTA 1: TAREAS =================
 function generarVistaTareas(tareas) {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
     let optionsProyectos = (dbCatalogos?.proyectos || []).map(p => `<option value="${p}">${p}</option>`).join('');
@@ -242,27 +255,45 @@ function generarVistaTareas(tareas) {
     `;
 }
 
-// ================= VISTA 2: GESTIÓN DE USUARIOS Y CATÁLOGOS =================
+// ================= VISTA 2: GESTIÓN DE USUARIOS Y TOKEN (ADMIN) =================
 function generarVistaUsuarios() {
     let optionsAreas = (dbCatalogos?.areas || []).map(a => `<option value="${a}">${a}</option>`).join('');
+    const adminActualObj = dbUsuarios.find(u => u.rol === 'admin');
+    const tokenConfigurado = adminActualObj && adminActualObj.tokenHash ? "🔒 Token de GitHub Configurado y Encriptado" : "⚠️ Sin Token Configurado";
 
     let htmlUsuarios = dbUsuarios.map(u => `
-        <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
+        <div class="p-4 bg-white rounded-2xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-sm">
             <div>
                 <b>${u.nombre}</b> (${u.usuario}) — Rol: <b class="uppercase">${u.rol}</b> — Área: <span class="text-blue-600 font-semibold">${u.area || 'General'}</span>
             </div>
-            ${u.rol !== 'admin' ? `<button onclick="eliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded-xl text-xs font-semibold">Eliminar</button>` : ''}
+            <div class="flex items-center gap-2">
+                <input type="password" id="newPass_${u.id}" placeholder="Nueva contraseña" class="px-3 py-1.5 border rounded-xl text-xs w-32">
+                <button onclick="cambiarPasswordUsuario(${u.id})" class="bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold">Cambiar Pass</button>
+                ${u.rol !== 'admin' ? `<button onclick="eliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1.5 rounded-xl text-xs font-semibold">Eliminar</button>` : ''}
+            </div>
         </div>
     `).join('');
 
     return `
         <div class="space-y-8">
+            <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-extrabold text-lg text-slate-900">🔑 Configuración de Token GitHub (Global para Editores)</h3>
+                    <span class="text-xs font-bold px-3 py-1 rounded-full ${adminActualObj?.tokenHash ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${tokenConfigurado}</span>
+                </div>
+                <p class="text-xs text-slate-500">Este token se guardará encriptado (hash) en el perfil de administrador para que los editores puedan sincronizar tareas con GitHub.</p>
+                <div class="flex gap-3">
+                    <input type="password" id="adminTokenInput" placeholder="Ingresa tu Personal Access Token (ghp_...)" class="w-full px-4 py-2.5 border rounded-xl text-sm">
+                    <button onclick="guardarTokenAdmin()" class="bg-slate-900 text-white font-semibold px-6 py-2.5 rounded-xl text-sm shadow whitespace-nowrap">Encriptar y Guardar Token</button>
+                </div>
+            </div>
+
             <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
                 <h3 class="font-extrabold text-lg">➕ Generar Nuevo Usuario Institucional</h3>
                 <div class="grid sm:grid-cols-5 gap-3">
                     <input type="text" id="uNombre" placeholder="Nombre completo" class="px-4 py-2.5 border rounded-xl text-sm">
                     <input type="text" id="uLogin" placeholder="Usuario (login)" class="px-4 py-2.5 border rounded-xl text-sm">
-                    <input type="password" id="uPass" placeholder="Contraseña (Token seguro)" class="px-4 py-2.5 border rounded-xl text-sm">
+                    <input type="password" id="uPass" placeholder="Contraseña institucional" class="px-4 py-2.5 border rounded-xl text-sm">
                     <select id="uRol" class="px-4 py-2.5 border rounded-xl text-sm bg-white"><option value="editor">Editor</option><option value="visualizador">Visualizador</option></select>
                     <select id="uArea" class="px-4 py-2.5 border rounded-xl text-sm bg-white">${optionsAreas}</select>
                 </div>
@@ -277,20 +308,18 @@ function generarVistaUsuarios() {
                 </div>
             </div>
 
-            <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">👥 Usuarios Registrados</h3><div class="space-y-2">${htmlUsuarios}</div></div>
+            <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">👥 Gestión de Contraseñas y Usuarios</h3><div class="space-y-3">${htmlUsuarios}</div></div>
         </div>
     `;
 }
 
-// ================= VISTA 3: CALENDARIO GRÁFICO =================
+// ================= VISTA 3: CALENDARIO =================
 function generarVistaCalendario(tareas) {
     return `
         <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-6">
-            <div class="flex justify-between items-center flex-wrap gap-4">
-                <div>
-                    <h2 class="text-xl font-extrabold text-slate-900">Calendario Gráfico de Actividades</h2>
-                    <p class="text-xs text-slate-500">Visualización de hitos y metas cronológicas.</p>
-                </div>
+            <div>
+                <h2 class="text-xl font-extrabold text-slate-900">Calendario Gráfico de Actividades</h2>
+                <p class="text-xs text-slate-500">Visualización de hitos y metas cronológicas.</p>
             </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
                 ${tareas.map(t => `
@@ -308,7 +337,7 @@ function generarVistaCalendario(tareas) {
     `;
 }
 
-// ================= VISTA 4: INFORMES EJECUTIVOS =================
+// ================= VISTA 4: INFORMES =================
 function generarVistaInformes(tareas) {
     let total = tareas.length;
     let concluidas = tareas.filter(t => t.estado === 'Concluida').length;
@@ -377,6 +406,34 @@ function generarVistaInformes(tareas) {
 }
 
 // ================= ACCIONES =================
+async function guardarTokenAdmin() {
+    const rawToken = document.getElementById('adminTokenInput').value.trim();
+    if (!rawToken) return alert('Ingresa un token válido.');
+
+    const adminObj = dbUsuarios.find(u => u.rol === 'admin');
+    if (adminObj) {
+        adminObj.tokenHash = encriptarPass(rawToken);
+        tokenAdmin = rawToken;
+        sessionStorage.setItem('ae_github_token', tokenAdmin);
+        await guardarEnGitHub('usuarios.json', dbUsuarios, 'Actualizar token encriptado de administrador');
+        mostrarToast('¡Token de GitHub encriptado y guardado con éxito!');
+        renderizarInterfazPorRol();
+    }
+}
+
+async function cambiarPasswordUsuario(id) {
+    const inputPass = document.getElementById(`newPass_${id}`).value.trim();
+    if (!inputPass) return alert('Ingresa la nueva contraseña.');
+
+    const usuarioObj = dbUsuarios.find(u => u.id === id);
+    if (usuarioObj) {
+        usuarioObj.pass = encriptarPass(inputPass);
+        await guardarEnGitHub('usuarios.json', dbUsuarios, `Actualizar contraseña de ${usuarioObj.usuario}`);
+        mostrarToast(`Contraseña actualizada y encriptada para ${usuarioObj.nombre}.`);
+        renderizarInterfazPorRol();
+    }
+}
+
 async function crearUsuario() {
     const nombre = document.getElementById('uNombre').value.trim();
     const usuario = document.getElementById('uLogin').value.trim();
@@ -458,7 +515,7 @@ async function eliminarTarea(id) {
     }
 }
 
-function exportarCSV() {
+export function exportarCSV() {
     let csv = "data:text/csv;charset=utf-8,\uFEFFID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
     dbTareas.forEach(t => csv += `${t.id},"${t.titulo}","${t.area}","${t.proyecto}",${t.estado},${t.avance}%,${t.fechaLimite},"${t.responsable}"\n`);
     const link = document.createElement("a");
