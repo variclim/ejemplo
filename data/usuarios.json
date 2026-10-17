@@ -16,5 +16,14 @@
     "rol": "visualizador",
     "area": "Agricola",
     "tokenHash": ""
+  },
+  {
+    "id": 1792265767643,
+    "nombre": "revisor",
+    "usuario": "revisor",
+    "passHash": "24cfbf800dc43c5ebf9365bd66aca374:1da3b8d69820c432fb220dd0ed8e1545bc108dac630693e5522c524dece2d30d",
+    "rol": "editor",
+    "area": "Administracion",
+    "tokenHash": ""
   }
 ]
