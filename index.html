@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Institucional Avanzada</title>
+    <title>Agenda Electrónica VariClim</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
@@ -18,7 +18,7 @@
             <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
                 <div>
-                    <h1 class="font-extrabold text-slate-900 text-lg tracking-tight">Agenda Institucional Profesional</h1>
+                    <h1 class="font-extrabold text-slate-900 text-lg tracking-tight">Agenda con Áreas definidas</h1>
                     <p class="text-xs text-slate-500">Sincronizada con GitHub (data/)</p>
                 </div>
             </div>
@@ -32,7 +32,7 @@
             <div class="bg-white p-16 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4 max-w-xl mx-auto">
                 <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">🔒</div>
                 <h2 class="text-2xl font-extrabold text-slate-900">Acceso Restringido</h2>
-                <p class="text-sm text-slate-500">Inicia sesión con tu cuenta institucional para acceder al sistema.</p>
+                <p class="text-sm text-slate-500">Inicia sesión con tu cuenta asignada para acceder al sistema.</p>
                 <button onclick="abrirModalLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow text-sm w-full">Ingresar al Sistema</button>
             </div>
         </main>
@@ -43,7 +43,7 @@
         <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6">
             <div class="text-center">
                 <h3 class="text-xl font-extrabold text-slate-900">Iniciar Sesión</h3>
-                <p class="text-xs text-slate-500 mt-1">Usa admin / admin</p>
+                <p class="text-xs text-slate-500 mt-1">Herramienta para gestion de Agenda</p>
             </div>
             <div class="space-y-4">
                 <div>
@@ -55,7 +55,7 @@
                     <input type="password" id="loginPassword" value="" maxlength="30" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (PAT - Solo Admin)</label>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (Solo Admin)</label>
                     <input type="password" id="loginTokenGitHub" placeholder="ghp_..." maxlength="50" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
             </div>
