@@ -3,7 +3,7 @@
     "id": 1,
     "nombre": "Administrador General",
     "usuario": "admin",
-    "passHash": "f3b1a2c4d5e6f7a8b9c0d1e2f3a4b5c6:9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e",
+    "passHash": "e419043b83e4a86d81ba1314684fe53c:912b35ac6c0d5f9d9d05fecbb5b62712284667b80c25e0b630dbe40724228624",
     "rol": "admin",
     "area": "Coordinacion",
     "perfil": "empresarial",
