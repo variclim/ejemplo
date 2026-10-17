@@ -13,7 +13,6 @@ let dbCatalogos = {
 };
 let dbTareas = [];
 
-// Estado de UI
 let tabPrincipal = 'tareas';
 let filtroTareas = 'todas';
 let mesCalendario = new Date();
@@ -200,6 +199,9 @@ function puedeAsignarCualquierArea() {
 function areasAsignables() {
     return puedeAsignarCualquierArea() ? dbCatalogos.areas : [sesionActual.area];
 }
+function esAdmin() {
+    return sesionActual && sesionActual.rol === 'admin';
+}
 
 // ================= RENDER PRINCIPAL =================
 function renderizarInterfazPorRol() {
@@ -210,7 +212,6 @@ function renderizarInterfazPorRol() {
         visualizador: 'bg-emerald-100 text-emerald-800'
     };
 
-    // Token: admin edita, editor/visualizador solo ven estado
     const bloqueToken = sesionActual.rol === 'admin'
         ? `<button onclick="abrirModalToken()" class="text-xs font-semibold px-3 py-2 rounded-xl transition ${tokenAdmin ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-700' : 'bg-amber-100 hover:bg-amber-200 text-amber-700'}">${tokenAdmin ? '✅ Token' : '⚙️ Token'}</button>`
         : `<span class="text-xs font-semibold px-3 py-2 rounded-xl ${tokenAdmin ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${tokenAdmin ? '🟢 Conectado' : '🔴 Desconectado'}</span>`;
@@ -267,7 +268,7 @@ function cambiarMes(delta) { mesCalendario.setMonth(mesCalendario.getMonth() + d
 function generarPanelTareas() {
     const visibles = tareasVisiblesParaUsuario();
     const esEditor = sesionActual.rol === 'editor';
-    const esAdmin = sesionActual.rol === 'admin';
+    const esAdm = sesionActual.rol === 'admin';
 
     const filtradas = visibles.filter(t => {
         if (filtroTareas === 'todas') return true;
@@ -301,10 +302,10 @@ function generarPanelTareas() {
                         <div class="bg-blue-600 h-full" style="width:${t.avance}%"></div>
                     </div>
                 </div>
-                ${(esEditor || esAdmin) ? `
+                ${(esEditor || esAdm) ? `
                     <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvanceTarea(${t.id}, this.value)" class="w-16 px-2 py-1.5 border rounded-xl text-xs text-center">
                     <button onclick="toggleConcluirTarea(${t.id})" class="px-3 py-1.5 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}">${t.estado}</button>
-                    ${esAdmin ? `<button onclick="eliminarTareaAdmin(${t.id})" class="bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-lg">Eliminar</button>` : ''}
+                    ${esAdm ? `<button onclick="eliminarTareaAdmin(${t.id})" class="bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-lg">Eliminar</button>` : ''}
                 ` : `
                     <span class="px-3 py-1 text-xs font-semibold rounded-xl ${t.estado === 'Concluida' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${t.estado}</span>
                 `}
@@ -313,7 +314,7 @@ function generarPanelTareas() {
     `).join('');
 
     let formularioNuevaTarea = '';
-    if (esEditor || esAdmin) {
+    if (esEditor || esAdm) {
         const areas = areasAsignables();
         const puedeElegirArea = puedeAsignarCualquierArea();
         const optionsAreas = areas.map(a => `<option value="${a}">${a}</option>`).join('');
@@ -333,6 +334,13 @@ function generarPanelTareas() {
         `;
     }
 
+    const botonesAdmin = esAdm ? `
+        <div class="flex gap-2 flex-wrap">
+            <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
+            <button onclick="abrirModalExportCSV('tareas')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
+        </div>
+    ` : '';
+
     const headerInfo = `
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -343,10 +351,7 @@ function generarPanelTareas() {
                       'Ves solo tareas de tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
                 </p>
             </div>
-            <div class="flex gap-2 flex-wrap">
-                <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
-                <button onclick="abrirModalExportCSV('tareas')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
-            </div>
+            ${botonesAdmin}
         </div>
     `;
 
@@ -399,6 +404,13 @@ function generarPanelCalendario() {
         `;
     }
 
+    const botonesAdmin = sesionActual.rol === 'admin' ? `
+        <div class="flex gap-2 flex-wrap">
+            <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
+            <button onclick="abrirModalExportCSV('calendario')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
+        </div>
+    ` : '';
+
     return `
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -407,10 +419,7 @@ function generarPanelCalendario() {
                     ${sesionActual.rol === 'admin' || sesionActual.verTodasAreas ? 'Mostrando todas las áreas.' : 'Mostrando solo tu área: <strong>' + (sesionActual.area || 'Sin área') + '</strong>.'}
                 </p>
             </div>
-            <div class="flex gap-2 flex-wrap">
-                <button onclick="abrirInformeEjecutivo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">🖨️ Informe Ejecutivo</button>
-                <button onclick="abrirModalExportCSV('calendario')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow transition">📥 Exportar CSV</button>
-            </div>
+            ${botonesAdmin}
         </div>
         <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex justify-between items-center">
@@ -661,8 +670,12 @@ async function agregarProyectoCatalogo() {
     renderizarInterfazPorRol();
 }
 
-// ================= MODAL EXPORTAR CSV =================
+// ================= MODAL EXPORTAR CSV (solo admin) =================
 function abrirModalExportCSV(origen = 'tareas') {
+    if (!esAdmin()) {
+        mostrarToast('Solo el administrador puede exportar.', 'error');
+        return;
+    }
     const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
     const y = mesCalendario.getFullYear();
     const m = mesCalendario.getMonth();
@@ -705,6 +718,11 @@ function cerrarModalExportCSV() {
     if (m) m.remove();
 }
 function ejecutarExportCSV(origen) {
+    if (!esAdmin()) {
+        mostrarToast('Solo el administrador puede exportar.', 'error');
+        cerrarModalExportCSV();
+        return;
+    }
     const alcance = document.querySelector('input[name="alcanceCSV"]:checked').value;
     const visibles = tareasVisiblesParaUsuario();
     const y = mesCalendario.getFullYear();
@@ -742,8 +760,12 @@ function ejecutarExportCSV(origen) {
     mostrarToast(`CSV exportado: ${filtradas.length} tareas.`);
 }
 
-// ================= INFORME EJECUTIVO =================
+// ================= INFORME EJECUTIVO (solo admin) =================
 function abrirInformeEjecutivo() {
+    if (!esAdmin()) {
+        mostrarToast('Solo el administrador puede generar informes.', 'error');
+        return;
+    }
     const visibles = tareasVisiblesParaUsuario();
     const total = visibles.length;
     const concluidas = visibles.filter(t => t.estado === 'Concluida').length;
@@ -767,9 +789,7 @@ function abrirInformeEjecutivo() {
     });
 
     const hoy = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
-    const alcance = sesionActual.rol === 'admin' ? 'Todas las áreas (Administrador)' :
-                    sesionActual.verTodasAreas ? 'Todas las áreas (permiso especial)' :
-                    `Área: ${sesionActual.area || 'Sin área'}`;
+    const alcance = 'Todas las áreas (Administrador)';
 
     const filasArea = Object.entries(porArea).map(([area, d]) => {
         const prom = Math.round(d.avanceSuma / d.total);
