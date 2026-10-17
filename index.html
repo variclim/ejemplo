@@ -3,74 +3,349 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda Electrónica Institucional | Control de Metas e Informes</title>
-    <!-- Tailwind CSS -->
+    <title>Agenda Electrónica Institucional</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased min-h-screen py-8 px-4">
 
     <div class="max-w-6xl mx-auto space-y-6">
+        <div id="toast" class="fixed top-5 right-5 z-50 hidden px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all"></div>
 
-        <!-- Notificación Flotante -->
-        <div id="toast" class="fixed top-5 right-5 z-50 hidden transition-all duration-300 transform translate-y-0 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm"></div>
-
-        <!-- Navbar Principal -->
+        <!-- Navbar -->
         <nav class="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md">📅</div>
                 <div>
                     <h1 class="font-extrabold text-slate-900 text-lg tracking-tight">Agenda Electrónica Institucional</h1>
-                    <p class="text-xs text-slate-500">Gestión de Tareas, Metas e Informes por Niveles</p>
+                    <p class="text-xs text-slate-500">Gestión de Tareas, Metas e Informes</p>
                 </div>
             </div>
             <div id="navSessionInfo" class="flex items-center gap-3">
-                <span id="badgeRol" class="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 text-slate-700">Sin sesión</span>
                 <button onclick="abrirModalLogin()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow">Iniciar Sesión</button>
             </div>
         </nav>
 
-        <!-- CONTENEDOR PRINCIPAL DONDE SE DIBUJAN LAS PANTALLAS SEGÚN EL ROL -->
+        <!-- Contenedor Principal Dinámico -->
         <main id="appContainer" class="space-y-6">
-            <!-- Estado Inicial: Pantalla de Bienvenida -->
             <div class="bg-white p-12 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4">
                 <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl mx-auto shadow-inner">🔒</div>
                 <h2 class="text-2xl font-extrabold text-slate-900">Bienvenido a la Agenda Electrónica</h2>
-                <p class="text-sm text-slate-500 max-w-md mx-auto">Para comenzar a ver actividades, administrar proyectos o gestionar usuarios, por favor inicia sesión con tus credenciales asignadas.</p>
+                <p class="text-sm text-slate-500 max-w-md mx-auto">Inicia sesión con la cuenta de Administrador para comenzar a operar el sistema.</p>
                 <button onclick="abrirModalLogin()" class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow text-sm">Ingresar al Sistema</button>
             </div>
         </main>
     </div>
 
-    <!-- MODAL DE LOGIN GENERAL -->
+    <!-- Modal Login -->
     <div id="modalLogin" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6">
             <div class="text-center">
                 <h3 class="text-xl font-extrabold text-slate-900">Iniciar Sesión</h3>
-                <p class="text-xs text-slate-500 mt-1">Ingresa tu usuario y contraseña institucional.</p>
+                <p class="text-xs text-slate-500 mt-1">Usa admin / admin123</p>
             </div>
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Usuario</label>
-                    <input type="text" id="loginUser" placeholder="Ej. admin, editor1, visualizador1" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    <input type="text" id="loginUser" value="admin" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Contraseña</label>
-                    <input type="password" id="loginPassword" placeholder="••••••••" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Token de GitHub (Solo para Admin al guardar cambios)</label>
-                    <input type="password" id="loginTokenGitHub" placeholder="ghp_..." class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    <input type="password" id="loginPassword" value="admin123" class="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
                 </div>
             </div>
             <div class="flex gap-3 pt-2">
-                <button onclick="cerrarModalLogin()" class="w-1/2 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm transition">Cancelar</button>
-                <button onclick="procesarLogin()" class="w-1/2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm transition shadow">Entrar</button>
+                <button onclick="cerrarModalLogin()" class="w-1/2 py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl text-sm">Cancelar</button>
+                <button onclick="procesarLogin()" class="w-1/2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm shadow">Entrar</button>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+        // Base de Datos en Memoria con persistencia en localStorage
+        let dbUsuarios = JSON.parse(localStorage.getItem('ae_usuarios')) || [
+            { id: 1, usuario: 'admin', pass: 'admin123', rol: 'admin', nombre: 'Administrador General' }
+        ];
+
+        let dbCatalogos = JSON.parse(localStorage.getItem('ae_catalogos')) || {
+            areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas', 'Administracion', 'Coordinacion'],
+            proyectos: ['Monitoreo Satelital 2026', 'Atlas de Riesgo Municipal', 'Red Hidrológica Presa San José']
+        };
+
+        let dbTareas = JSON.parse(localStorage.getItem('ae_tareas')) || [
+            { id: 1, titulo: 'Análisis NDVI Cuenca Alta', area: 'Geomatica', proyecto: 'Monitoreo Satelital 2026', estado: 'Pendiente', avance: 40, fechaLimite: '2026-05-15', responsable: 'Sistema' }
+        ];
+
+        let sesionActual = JSON.parse(localStorage.getItem('ae_sesion')) || null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (sesionActual) renderizarInterfazPorRol();
+        });
+
+        function mostrarToast(msg, tipo = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = `fixed top-5 right-5 z-50 px-6 py-3 rounded-2xl shadow-xl text-white font-medium text-sm transition-all ${tipo === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function guardarDatos() {
+            localStorage.setItem('ae_usuarios', JSON.stringify(dbUsuarios));
+            localStorage.setItem('ae_catalogos', JSON.stringify(dbCatalogos));
+            localStorage.setItem('ae_tareas', JSON.stringify(dbTareas));
+        }
+
+        function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
+        function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
+
+        function procesarLogin() {
+            const user = document.getElementById('loginUser').value.trim();
+            const pass = document.getElementById('loginPassword').value.trim();
+            const encontrado = dbUsuarios.find(u => u.usuario === user && u.pass === pass);
+
+            if (encontrado) {
+                sesionActual = encontrado;
+                localStorage.setItem('ae_sesion', JSON.stringify(sesionActual));
+                cerrarModalLogin();
+                mostrarToast(`¡Bienvenido, ${encontrado.nombre}!`);
+                renderizarInterfazPorRol();
+            } else {
+                alert('Usuario o contraseña incorrectos.');
+            }
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('ae_sesion');
+            sesionActual = null;
+            location.reload();
+        }
+
+        function renderizarInterfazPorRol() {
+            const navInfo = document.getElementById('navSessionInfo');
+            const rolColors = { admin: 'bg-purple-100 text-purple-800', editor: 'bg-blue-100 text-blue-800', visualizador: 'bg-emerald-100 text-emerald-800' };
+
+            navInfo.innerHTML = `
+                <div class="text-right">
+                    <span class="block text-xs font-bold text-slate-800">${sesionActual.nombre}</span>
+                    <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${rolColors[sesionActual.rol]}">${sesionActual.rol}</span>
+                </div>
+                <button onclick="cerrarSesion()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-xl transition">Salir</button>
+            `;
+
+            const container = document.getElementById('appContainer');
+            if (sesionActual.rol === 'visualizador') container.innerHTML = generarVistaVisualizador();
+            else if (sesionActual.rol === 'editor') container.innerHTML = generarVistaEditor();
+            else if (sesionActual.rol === 'admin') container.innerHTML = generarVistaAdmin();
+        }
+
+        function generarVistaVisualizador() {
+            let htmlTareas = dbTareas.map(t => `
+                <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
+                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-blue-50 text-blue-600">${t.proyecto}</span>
+                        <h4 class="font-bold text-slate-900 mt-1">${t.titulo}</h4>
+                        <p class="text-xs text-slate-500">Límite: ${t.fechaLimite} — Responsable: ${t.responsable}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-bold">Avance: ${t.avance}%</span>
+                        <span class="block px-3 py-1 text-xs font-semibold rounded-xl mt-1 ${t.estado === 'Concluida' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">${t.estado}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            return `<div class="space-y-6"><div class="bg-white p-6 rounded-3xl border shadow-sm"><h2 class="text-xl font-extrabold">Panel de Visualización</h2></div><div class="space-y-3">${htmlTareas || '<p>No hay tareas.</p>'}</div></div>`;
+        }
+
+        function generarVistaEditor() {
+            let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
+            let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            let htmlTareas = dbTareas.map(t => `
+                <div class="p-5 bg-white rounded-2xl border shadow-sm flex justify-between items-center">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase px-2 py-1 rounded bg-slate-100">${t.area}</span>
+                        <h4 class="font-bold text-slate-900 mt-1">${t.titulo}</h4>
+                        <p class="text-xs text-slate-500">Límite: ${t.fechaLimite}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="number" min="0" max="100" value="${t.avance}" onchange="actualizarAvance(${t.id}, this.value)" class="w-16 px-2 py-1 border rounded text-xs text-center">
+                        <button onclick="toggleConcluir(${t.id})" class="px-3 py-1 text-xs font-semibold rounded ${t.estado === 'Concluida' ? 'bg-emerald-600 text-white' : 'bg-slate-100'}">${t.estado}</button>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-3xl border shadow-sm space-y-4">
+                        <h2 class="text-xl font-extrabold">Panel de Editor — Agregar Tareas</h2>
+                        <div class="grid sm:grid-cols-4 gap-3">
+                            <input type="text" id="edTitulo" placeholder="Título" class="px-4 py-2 border rounded-xl text-sm">
+                            <select id="edArea" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsAreas}</select>
+                            <select id="edProyecto" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsProyectos}</select>
+                            <input type="date" id="edFecha" class="px-4 py-2 border rounded-xl text-sm">
+                        </div>
+                        <button onclick="editorAgregarTarea()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Guardar Tarea</button>
+                    </div>
+                    <div class="space-y-3">${htmlTareas}</div>
+                </div>
+            `;
+        }
+
+        function generarVistaAdmin() {
+            let optionsAreas = dbCatalogos.areas.map(a => `<option value="${a}">${a}</option>`).join('');
+            let optionsProyectos = dbCatalogos.proyectos.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            let htmlUsuarios = dbUsuarios.map(u => `
+                <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
+                    <span><b>${u.nombre}</b> (${u.usuario}) — Rol: <b>${u.rol}</b></span>
+                    ${u.rol !== 'admin' ? `<button onclick="adminEliminarUsuario(${u.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded text-xs font-semibold">Eliminar</button>` : ''}
+                </div>
+            `).join('');
+
+            let htmlTareas = dbTareas.map(t => `
+                <div class="p-4 bg-white rounded-2xl border flex justify-between items-center text-sm">
+                    <span><b>${t.titulo}</b> (${t.area} / ${t.proyecto})</span>
+                    <button onclick="adminEliminarTarea(${t.id})" class="bg-rose-50 text-rose-600 px-3 py-1 rounded text-xs font-semibold">Eliminar</button>
+                </div>
+            `).join('');
+
+            return `
+                <div class="space-y-8">
+                    <div class="grid sm:grid-cols-3 gap-4">
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Total Tareas</span><h3 class="text-3xl font-extrabold mt-1">${dbTareas.length}</h3></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm"><span class="text-xs font-bold text-slate-400 uppercase">Concluidas</span><h3 class="text-3xl font-extrabold text-emerald-600 mt-1">${dbTareas.filter(t => t.estado === 'Concluida').length}</h3></div>
+                        <div class="bg-white p-6 rounded-3xl border shadow-sm flex flex-col justify-between"><span class="text-xs font-bold text-slate-400 uppercase">Informes</span><button onclick="exportarCSV()" class="bg-emerald-600 text-white font-semibold text-xs py-2 px-4 rounded-xl">📥 Exportar CSV</button></div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                        <h3 class="font-extrabold text-lg">➕ Crear Usuario</h3>
+                        <div class="grid sm:grid-cols-4 gap-3">
+                            <input type="text" id="nuevoNombre" placeholder="Nombre" class="px-4 py-2 border rounded-xl text-sm">
+                            <input type="text" id="nuevoUser" placeholder="Usuario" class="px-4 py-2 border rounded-xl text-sm">
+                            <input type="password" id="nuevoPass" placeholder="Contraseña" class="px-4 py-2 border rounded-xl text-sm">
+                            <select id="nuevoRol" class="px-4 py-2 border rounded-xl text-sm bg-white"><option value="editor">Editor</option><option value="visualizador">Visualizador</option></select>
+                        </div>
+                        <button onclick="adminCrearUsuario()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Crear</button>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                        <h3 class="font-extrabold text-lg">📁 Catálogos</h3>
+                        <div class="grid sm:grid-cols-2 gap-6">
+                            <div><input type="text" id="catArea" placeholder="Nueva Área" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarArea()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Área</button><p class="text-xs text-slate-500 mt-2">${dbCatalogos.areas.join(', ')}</p></div>
+                            <div><input type="text" id="catProj" placeholder="Nuevo Proyecto" class="px-4 py-2 border rounded-xl text-sm w-full mb-2"><button onclick="adminAgregarProyecto()" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Agregar Proyecto</button><p class="text-xs text-slate-500 mt-2">${dbCatalogos.proyectos.join(', ')}</p></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4">
+                        <h3 class="font-extrabold text-lg">📝 Registrar Tarea</h3>
+                        <div class="grid sm:grid-cols-4 gap-3">
+                            <input type="text" id="admTitulo" placeholder="Título" class="px-4 py-2 border rounded-xl text-sm">
+                            <select id="admArea" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsAreas}</select>
+                            <select id="admProj" class="px-4 py-2 border rounded-xl text-sm bg-white">${optionsProyectos}</select>
+                            <input type="date" id="admFecha" class="px-4 py-2 border rounded-xl text-sm">
+                        </div>
+                        <button onclick="adminCrearTarea()" class="bg-blue-600 text-white font-semibold px-6 py-2 rounded-xl text-sm">Guardar</button>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">👥 Usuarios</h3><div class="space-y-2">${htmlUsuarios}</div></div>
+                    <div class="bg-white p-8 rounded-3xl border shadow-sm space-y-4"><h3 class="font-extrabold text-lg">📋 Tareas</h3><div class="space-y-2">${htmlTareas}</div></div>
+                </div>
+            `;
+        }
+
+        // Acciones
+        function adminCrearUsuario() {
+            const nombre = document.getElementById('nuevoNombre').value.trim();
+            const usuario = document.getElementById('nuevoUser').value.trim();
+            const pass = document.getElementById('nuevoPass').value.trim();
+            const rol = document.getElementById('nuevoRol').value;
+            if (!nombre || !usuario || !pass) return alert('Completa todos los campos.');
+            dbUsuarios.push({ id: Date.now(), nombre, usuario, pass, rol });
+            guardarDatos();
+            mostrarToast('Usuario creado.');
+            renderizarInterfazPorRol();
+        }
+
+        function adminEliminarUsuario(id) {
+            dbUsuarios = dbUsuarios.filter(u => u.id !== id);
+            guardarDatos();
+            renderizarInterfazPorRol();
+        }
+
+        function adminAgregarArea() {
+            const val = document.getElementById('catArea').value.trim();
+            if (val && !dbCatalogos.areas.includes(val)) { dbCatalogos.areas.push(val); guardarDatos(); renderizarInterfazPorRol(); }
+        }
+
+        function adminAgregarProyecto() {
+            const val = document.getElementById('catProj').value.trim();
+            if (val && !dbCatalogos.proyectos.includes(val)) { dbCatalogos.proyectos.push(val); guardarDatos(); renderizarInterfazPorRol(); }
+        }
+
+        function adminCrearTarea() {
+            const titulo = document.getElementById('admTitulo').value.trim();
+            const area = document.getElementById('admArea').value;
+            const proyecto = document.getElementById('admProj').value;
+            const fechaLimite = document.getElementById('admFecha').value;
+            if (!titulo || !fechaLimite) return alert('Completa título y fecha.');
+            dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: 'Administrador' });
+            guardarDatos();
+            mostrarToast('Tarea creada.');
+            renderizarInterfazPorRol();
+        }
+
+        function editorAgregarTarea() {
+            const titulo = document.getElementById('edTitulo').value.trim();
+            const area = document.getElementById('edArea').value;
+            const proyecto = document.getElementById('edProyecto').value;
+            const fechaLimite = document.getElementById('edFecha').value;
+            if (!titulo || !fechaLimite) return alert('Completa campos.');
+            dbTareas.push({ id: Date.now(), titulo, area, proyecto, estado: 'Pendiente', avance: 0, fechaLimite, responsable: sesionActual.nombre });
+            guardarDatos();
+            mostrarToast('Tarea agregada.');
+            renderizarInterfazPorRol();
+        }
+
+        function actualizarAvance(id, val) {
+            const t = dbTareas.find(x => x.id === id);
+            if (t) {
+                t.avance = parseInt(val) || 0;
+                if (t.avance >= 100) { t.avance = 100; t.estado = 'Concluida'; }
+                else t.estado = 'Pendiente';
+                guardarDatos();
+                renderizarInterfazPorRol();
+            }
+        }
+
+        function toggleConcluir(id) {
+            const t = dbTareas.find(x => x.id === id);
+            if (t) {
+                t.estado = t.estado === 'Concluida' ? 'Pendiente' : 'Concluida';
+                if (t.estado === 'Concluida') t.avance = 100;
+                guardarDatos();
+                renderizarInterfazPorRol();
+            }
+        }
+
+        function adminEliminarTarea(id) {
+            dbTareas = dbTareas.filter(t => t.id !== id);
+            guardarDatos();
+            renderizarInterfazPorRol();
+        }
+
+        function exportarCSV() {
+            let csv = "data:text/csv;charset=utf-8,\uFEFFID,Titulo,Area,Proyecto,Estado,Avance,Fecha Limite,Responsable\n";
+            dbTareas.forEach(t => csv += `${t.id},"${t.titulo}","${t.area}","${t.proyecto}",${t.estado},${t.avance}%,${t.fechaLimite},"${t.responsable}"\n`);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csv));
+            link.setAttribute("download", "Reporte_Agenda.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
 </body>
 </html>
