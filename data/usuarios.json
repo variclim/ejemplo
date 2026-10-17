@@ -7,5 +7,14 @@
     "rol": "admin",
     "area": "Coordinacion",
     "tokenHash": ""
+  },
+  {
+    "id": 1792265629177,
+    "nombre": "juan",
+    "usuario": "juan",
+    "passHash": "e22c82a32299c3b143c3030866c46561:fb6dfe9b802b366656a5bafc8d492d7c34b4bc74c7664c05f8990833b0b141c3",
+    "rol": "visualizador",
+    "area": "Agricola",
+    "tokenHash": ""
   }
 ]
