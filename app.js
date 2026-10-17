@@ -11,7 +11,6 @@ let dbCatalogos = { areas: ['Agricola', 'Geomatica', 'Meteorologia', 'Sistemas',
 let dbTareas = [];
 let pestanaActiva = 'tareas'; 
 
-// Hash SHA-256 oficial para "admin123"
 const usuarioAdminDefault = [
     { id: 1, usuario: 'admin', passHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', rol: 'admin', nombre: 'Administrador General', area: 'Coordinacion', tokenHash: '' }
 ];
@@ -36,7 +35,7 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
-// ================= SHA-256 ROBUSTO Y DIRECTO =================
+// ================= SHA-256 ESTÁNDAR Y ROBUSTO =================
 function sha256(ascii) {
     function rightRotate(value, amount) {
         return (value >>> amount) | (value << (32 - amount));
@@ -179,7 +178,7 @@ async function guardarEnGitHub(rutaArchivo, contenidoObjeto, mensajeCommit) {
     }
 }
 
-// ================= AUTENTICACIÓN =================
+// ================= AUTENTICACIÓN CON SHA-256 =================
 function abrirModalLogin() { document.getElementById('modalLogin').classList.remove('hidden'); }
 function cerrarModalLogin() { document.getElementById('modalLogin').classList.add('hidden'); }
 
@@ -192,8 +191,6 @@ function procesarLogin() {
 
     if (encontrado) {
         const hashIngresado = sha256(pass);
-        
-        // Valida contra passHash o respaldo opcional en texto plano
         const esValida = (encontrado.passHash && encontrado.passHash === hashIngresado) || (encontrado.pass && encontrado.pass === pass);
 
         if (esValida) {
