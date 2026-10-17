@@ -4,20 +4,7 @@
     "usuario": "admin",
     "pass": "admin123",
     "rol": "admin",
-    "nombre": "Administrador General"
-  },
-  {
-    "id": 1792207630940,
-    "nombre": "Juancho",
-    "usuario": "juan",
-    "pass": "juan1",
-    "rol": "visualizador"
-  },
-  {
-    "id": 1792207748107,
-    "nombre": "don chingon",
-    "usuario": "uno1",
-    "pass": "uno123",
-    "rol": "editor"
+    "nombre": "Administrador General",
+    "area": "Coordinacion"
   }
 ]
