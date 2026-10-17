@@ -1,6 +1,6 @@
 // ================= CONFIGURACIÓN DE TU REPOSITORIO GITHUB =================
-const GITHUB_USER = "tu-usuario-de-github";
-const GITHUB_REPO = "nombre-de-tu-repositorio";
+const GITHUB_USER = "variclim";
+const GITHUB_REPO = "ejemplo";
 const GITHUB_BRANCH = "main";
 
 let tokenAdmin = sessionStorage.getItem('ep_github_token') || "";
